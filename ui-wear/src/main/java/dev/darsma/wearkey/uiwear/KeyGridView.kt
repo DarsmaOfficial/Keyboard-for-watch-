@@ -152,11 +152,11 @@ class KeyGridView @JvmOverloads constructor(
         if (width == 0 || height == 0) return
 
         val density = resources.displayMetrics.density
-        // Reserve top area for the composition strip (spec §5: Y 16dp-54dp) — owned by
-        // CompositionStripView, not drawn here.
-        val stripBottomPx = 54f * density
-        val gridTop = stripBottomPx + 4f * density
-        val gridBottom = height.toFloat() - 4f * density
+        // The composition strip is a sibling view above this one (KeyboardSurfaceView is a
+        // vertical LinearLayout), so no vertical space is reserved here any more — this view
+        // gets exactly the area it should fill.
+        val gridTop = 2f * density
+        val gridBottom = height.toFloat() - 2f * density
         val gridHeight = gridBottom - gridTop
 
         // 3 letter rows + 1 function row (space/backspace/enter).

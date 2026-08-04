@@ -3,7 +3,7 @@ package dev.darsma.wearkey.uiwear
 import android.content.Context
 import android.graphics.Color
 import android.util.AttributeSet
-import android.widget.FrameLayout
+import android.widget.LinearLayout
 import dev.darsma.wearkey.imecore.EditorState
 
 /**
@@ -13,12 +13,20 @@ import dev.darsma.wearkey.imecore.EditorState
  * point to render identically — "no forked UI". This class is that shared piece: both
  * WearKeyImeService and LaunchKeyboardActivity instantiate exactly one of these and wire it to
  * their own EditorState + key-action handling, but never draw anything themselves.
+ *
+ * CRITICAL SIZING RULE (spec §1 — the actual problem being solved): the keyboard must NOT fill
+ * the display. If it does, the app's real text field is completely hidden behind it and the
+ * user is back to Gboard's failure mode — guessing at what they typed. The surface therefore
+ * claims only [KEYBOARD_HEIGHT_FRACTION] of the screen height; the system resizes/pans the
+ * target app into the space above, keeping the genuine field on screen. The composition strip
+ * is the *backup* guarantee for the cases where an app still can't be resized — not a
+ * replacement for seeing the real field.
  */
 class KeyboardSurfaceView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
-) : FrameLayout(context, attrs, defStyleAttr) {
+) : LinearLayout(context, attrs, defStyleAttr) {
 
     val compositionStrip: CompositionStripView
     val keyGrid: KeyGridView
@@ -26,22 +34,23 @@ class KeyboardSurfaceView @JvmOverloads constructor(
     init {
         setBackgroundColor(Color.BLACK)
 
-        val density = resources.displayMetrics.density
-        // Spec §5: strip is 38dp tall, positioned Y 16dp -> 54dp (16dp top margin + 38dp height).
-        val stripTopMarginPx = (16f * density).toInt()
-        val stripHeightPx = (38f * density).toInt()
+        orientation = VERTICAL
 
-        keyGrid = KeyGridView(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-        }
-        addView(keyGrid)
+        val density = resources.displayMetrics.density
+        // Strip is now a compact band at the TOP OF THE KEYBOARD (not floating over a
+        // full-screen surface). It is deliberately thin: the app's own field above the keyboard
+        // is the primary place the user reads their text; this is the fallback mirror.
+        val stripHeightPx = (28f * density).toInt()
 
         compositionStrip = CompositionStripView(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, stripHeightPx).also {
-                it.topMargin = stripTopMarginPx
-            }
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, stripHeightPx)
         }
         addView(compositionStrip)
+
+        keyGrid = KeyGridView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
+        }
+        addView(keyGrid)
     }
 
     /** Wires both sub-views to the given state in one call — keeps entry points' code trivial. */
@@ -57,7 +66,30 @@ class KeyboardSurfaceView @JvmOverloads constructor(
         compositionStrip.onCaretRequestListener = null
     }
 
+    /**
+     * Constrains the keyboard to the bottom fraction of the display so the app's real field
+     * stays visible above it. Without this the IME window fills all 466x466 px and hides the
+     * very thing the user is trying to see.
+     */
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val screenHeight = resources.displayMetrics.heightPixels
+        val targetHeight = (screenHeight * KEYBOARD_HEIGHT_FRACTION).toInt()
+        super.onMeasure(
+            widthMeasureSpec,
+            MeasureSpec.makeMeasureSpec(targetHeight, MeasureSpec.EXACTLY)
+        )
+    }
+
     fun startFrameTiming() = keyGrid.startFrameTiming()
     fun stopFrameTiming() = keyGrid.stopFrameTiming()
     fun frameStats(): Pair<Int, Int> = keyGrid.frameStats()
+
+    companion object {
+        /**
+         * Fraction of screen height the keyboard is allowed to occupy. 0.62 leaves ~177px on a
+         * 466px round display — enough for a Wear text field plus its app chrome to remain
+         * visible, while still giving the key grid usable touch targets. Tuned on-device.
+         */
+        const val KEYBOARD_HEIGHT_FRACTION = 0.62f
+    }
 }
