@@ -4,6 +4,7 @@ import android.inputmethodservice.InputMethodService
 import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodSubtype
 import dev.darsma.wearkey.imecore.EditorState
 import dev.darsma.wearkey.uiwear.KeyGridView
 import dev.darsma.wearkey.uiwear.KeyboardSurfaceView
@@ -59,6 +60,19 @@ class WearKeyImeService : InputMethodService() {
         super.onFinishInputView(finishingInput)
     }
 
+    /**
+     * Spec §5.5: the real Android mechanism for language switching. Fires when the OS switches
+     * subtypes on our behalf (system language picker, switchToNextInputMethod, or restoring the
+     * user's last-used subtype for this field) — swap the key grid layout to match.
+     */
+    override fun onCurrentInputMethodSubtypeChanged(subtype: InputMethodSubtype?) {
+        super.onCurrentInputMethodSubtypeChanged(subtype)
+        surfaceView?.keyGrid?.layout = when (subtype?.languageTag) {
+            "ru-RU" -> KeyGridView.Layout.RU_RU
+            else -> KeyGridView.Layout.EN_US
+        }
+    }
+
     override fun onFinishInput() {
         // Spec §11.5: state must never leak into the next field.
         editorState.reset()
@@ -101,6 +115,12 @@ class WearKeyImeService : InputMethodService() {
                     ic.sendKeyEvent(
                         android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_ENTER)
                     )
+                }
+                KeyGridView.KeyAction.SwitchLanguage -> {
+                    // Device reports mSupportsSwitchingToNextInputMethod=true (spec §5.5) — use
+                    // the real subtype-cycling API rather than mutating the layout directly, so
+                    // the system stays the source of truth and remembers the choice per field.
+                    switchToNextInputMethod(false)
                 }
             }
         } finally {

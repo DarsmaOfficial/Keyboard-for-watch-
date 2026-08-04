@@ -32,6 +32,7 @@ class KeyGridView @JvmOverloads constructor(
         object Space : KeyAction()
         object Backspace : KeyAction()
         object Enter : KeyAction()
+        object SwitchLanguage : KeyAction()
     }
 
     fun interface OnKeyListener {
@@ -40,12 +41,40 @@ class KeyGridView @JvmOverloads constructor(
 
     var onKeyListener: OnKeyListener? = null
 
-    // Letter rows approximate QWERTY — geometry replaced in Phase 2 with round-optimised layout.
-    private val letterRows = listOf(
+    /**
+     * Layout enum backing the in-keyboard language key (spec §5.5: "on a watch, opening system
+     * settings to change language is unusable" — so a key here is required, not optional, even
+     * though InputMethodSubtype is the system-level mechanism of record).
+     */
+    enum class Layout { EN_US, RU_RU }
+
+    // Letter rows approximate QWERTY/ЙЦУКЕН — geometry replaced in Phase 2 with round-optimised
+    // layout (spec §7.1). Row *shapes* differ between locales (Russian has an extra row char);
+    // that's fine here, real geometry work happens in Phase 2 regardless of language.
+    private val enRows = listOf(
         "QWERTYUIOP",
         "ASDFGHJKL",
         "ZXCVBNM"
     )
+    private val ruRows = listOf(
+        "ЙЦУКЕНГШЩЗ",
+        "ФЫВАПРОЛДЖ",
+        "ЯЧСМИТЬБЮ"
+    )
+
+    var layout: Layout = Layout.EN_US
+        set(value) {
+            if (field == value) return
+            field = value
+            computeLayout()
+            invalidate()
+        }
+
+    private val letterRows: List<String>
+        get() = when (layout) {
+            Layout.EN_US -> enRows
+            Layout.RU_RU -> ruRows
+        }
 
     private data class Key(val action: KeyAction, val label: String, val rect: RectF)
 
@@ -151,31 +180,40 @@ class KeyGridView @JvmOverloads constructor(
             }
         }
 
-        // Function row: backspace | space (wide) | enter.
+        // Function row: backspace | switch-language | space (wide) | enter.
+        // Spec §5.5: an in-keyboard language key is required, not optional — opening system
+        // settings to change language is unusable on a watch.
         val funcTop = gridTop + 3 * rowHeight
         val funcBottom = funcTop + rowHeight
-        val backspaceWidth = width * 0.25f
-        val enterWidth = width * 0.25f
-        val spaceWidth = width - backspaceWidth - enterWidth
+        val backspaceWidth = width * 0.20f
+        val switchLangWidth = width * 0.16f
+        val enterWidth = width * 0.20f
+        val spaceWidth = width - backspaceWidth - switchLangWidth - enterWidth
 
+        var x = 0f
+        keys.add(
+            Key(KeyAction.Backspace, "⌫", RectF(x + 2f, funcTop + 2f, x + backspaceWidth - 2f, funcBottom - 2f))
+        )
+        x += backspaceWidth
         keys.add(
             Key(
-                KeyAction.Backspace, "⌫",
-                RectF(2f, funcTop + 2f, backspaceWidth - 2f, funcBottom - 2f)
+                KeyAction.SwitchLanguage, switchLanguageLabel(),
+                RectF(x + 2f, funcTop + 2f, x + switchLangWidth - 2f, funcBottom - 2f)
             )
         )
+        x += switchLangWidth
         keys.add(
-            Key(
-                KeyAction.Space, "␣",
-                RectF(backspaceWidth + 2f, funcTop + 2f, backspaceWidth + spaceWidth - 2f, funcBottom - 2f)
-            )
+            Key(KeyAction.Space, "␣", RectF(x + 2f, funcTop + 2f, x + spaceWidth - 2f, funcBottom - 2f))
         )
+        x += spaceWidth
         keys.add(
-            Key(
-                KeyAction.Enter, "⏎",
-                RectF(backspaceWidth + spaceWidth + 2f, funcTop + 2f, width - 2f, funcBottom - 2f)
-            )
+            Key(KeyAction.Enter, "⏎", RectF(x + 2f, funcTop + 2f, width - 2f, funcBottom - 2f))
         )
+    }
+
+    private fun switchLanguageLabel(): String = when (layout) {
+        Layout.EN_US -> "RU" // shows the language you'll switch TO, matching common IME convention
+        Layout.RU_RU -> "EN"
     }
 
     override fun onDraw(canvas: Canvas) {

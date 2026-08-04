@@ -60,6 +60,19 @@ class LaunchKeyboardActivity : Activity() {
             KeyGridView.KeyAction.Space -> editorState.commitText(" ")
             KeyGridView.KeyAction.Backspace -> editorState.backspace()
             KeyGridView.KeyAction.Enter -> commitAndFinish()
+            KeyGridView.KeyAction.SwitchLanguage -> {
+                // Activity (not an InputMethodService) has no switchToNextInputMethod() /
+                // InputMethodSubtype API — this is a plain Activity per spec §4.5, so the
+                // language key here just toggles the shared KeyGridView's local layout. It
+                // still exercises the exact same layout-swap code path as the IME (spec
+                // requirement: "no forked UI"), just driven differently since a RemoteInput
+                // chooser activity has no subtype concept of its own to defer to.
+                val grid = surfaceView?.keyGrid ?: return
+                grid.layout = when (grid.layout) {
+                    KeyGridView.Layout.EN_US -> KeyGridView.Layout.RU_RU
+                    KeyGridView.Layout.RU_RU -> KeyGridView.Layout.EN_US
+                }
+            }
         }
     }
 
