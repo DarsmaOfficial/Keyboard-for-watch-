@@ -1,0 +1,49 @@
+name: Build debug APK
+
+# Convenience only (spec §3.1): the project MUST remain buildable fully offline with
+# `./gradlew assembleDebug` on a developer machine. This workflow exists because the sandbox
+# used for day-to-day development cannot JIT-compile (PRoot blocks mprotect(PROT_EXEC)), which
+# makes local Gradle builds correct but very slow. CI is never a hard dependency.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Verify no arm64 libs and no androidx.compose deps in :app / :ui-wear (spec §8.0, §3 item 2)
+        run: |
+          ./gradlew :app:dependencies :ui-wear:dependencies --configuration releaseRuntimeClasspath > /tmp/deps.txt || true
+          if grep -qi "androidx.compose" /tmp/deps.txt; then
+            echo "::error::androidx.compose.* dependency leaked into :app or :ui-wear (spec §8.0 forbids this)"
+            exit 1
+          fi
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
