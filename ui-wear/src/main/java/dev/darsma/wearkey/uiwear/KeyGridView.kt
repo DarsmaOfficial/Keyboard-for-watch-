@@ -7,21 +7,19 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.Choreographer
+import android.view.MotionEvent
 import android.view.View
 
 /**
- * Phase 0 scaffold: a trivial custom View + Canvas key grid.
+ * Custom View + Canvas key grid (spec §8.0 — no androidx.compose.* in this module).
  *
- * Purpose right now is narrow — confirm the two Wear OS entry points (IME + LAUNCH_KEYBOARD
- * Activity, spec §4.5) both reach a rendering surface, and measure real frame time on the W5
- * chipset (spec Phase 0 exit criterion: >=95% of frames under 16.6 ms).
+ * Phase 0 proved the two Wear OS entry points both reach this surface and measured frame time.
+ * Phase 1 adds: actual key press handling (tap → character/action callback) and a functional
+ * row of space/backspace/enter so a full type-and-see-it-composed loop works end to end.
  *
- * Deliberately NOT the final key grid:
- *  - no circular hit-zone extension / bivariate Gaussian touch model (spec §7.1, Phase 2)
- *  - no per-key press animation / spring physics (spec §8.0, Phase 3)
- *  - keys are laid out as a plain rectangular grid, not tuned for the round bezel yet
- *
- * Rendering stays strictly View + Canvas, per spec §8.0 — no androidx.compose.* in this module.
+ * Deliberately NOT the final key grid — no circular hit-zone extension / bivariate Gaussian
+ * touch model yet (spec §7.1, Phase 2), no press animation / spring physics yet (spec §8.0,
+ * Phase 3). Geometry here is a plain rectangular grid, replaced in Phase 2.
  */
 class KeyGridView @JvmOverloads constructor(
     context: Context,
@@ -29,15 +27,38 @@ class KeyGridView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    // Rows approximate QWERTY layout — geometry will be replaced in Phase 2.
-    private val rows = listOf(
+    sealed class KeyAction {
+        data class Character(val char: Char) : KeyAction()
+        object Space : KeyAction()
+        object Backspace : KeyAction()
+        object Enter : KeyAction()
+    }
+
+    fun interface OnKeyListener {
+        fun onKey(action: KeyAction)
+    }
+
+    var onKeyListener: OnKeyListener? = null
+
+    // Letter rows approximate QWERTY — geometry replaced in Phase 2 with round-optimised layout.
+    private val letterRows = listOf(
         "QWERTYUIOP",
         "ASDFGHJKL",
         "ZXCVBNM"
     )
 
+    private data class Key(val action: KeyAction, val label: String, val rect: RectF)
+
+    private val keys = mutableListOf<Key>()
+    private var pressedKey: Key? = null
+
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#1C1C1E")
+        style = Paint.Style.FILL
+    }
+
+    private val keyPressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#3A3A3C")
         style = Paint.Style.FILL
     }
 
@@ -50,7 +71,6 @@ class KeyGridView @JvmOverloads constructor(
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        isFakeBoldText = false
     }
 
     private val backgroundPaint = Paint().apply {
@@ -58,9 +78,7 @@ class KeyGridView @JvmOverloads constructor(
         style = Paint.Style.FILL
     }
 
-    private val keyRect = RectF()
-
-    // --- Frame-time instrumentation (Phase 0 exit criterion) ---
+    // --- Frame-time instrumentation (Phase 0 exit criterion, kept for ongoing regression checks) ---
     private var frameTimingEnabled = false
     private var frameCount = 0
     private var droppedFrames = 0
@@ -80,7 +98,6 @@ class KeyGridView @JvmOverloads constructor(
         }
     }
 
-    /** Starts continuous invalidation + frame-time sampling for Phase 0 measurement. */
     fun startFrameTiming() {
         if (frameTimingEnabled) return
         frameTimingEnabled = true
@@ -96,39 +113,122 @@ class KeyGridView @JvmOverloads constructor(
 
     fun frameStats(): Pair<Int, Int> = frameCount to droppedFrames
 
-    override fun onDraw(canvas: Canvas) {
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        computeLayout()
+    }
 
-        // Reserve top area for the composition strip (spec §5: Y 16dp-54dp) — Phase 0 just
-        // leaves the space empty; EditorState + strip land in Phase 1.
+    private fun computeLayout() {
+        keys.clear()
+        if (width == 0 || height == 0) return
+
         val density = resources.displayMetrics.density
+        // Reserve top area for the composition strip (spec §5: Y 16dp-54dp) — owned by
+        // CompositionStripView, not drawn here.
         val stripBottomPx = 54f * density
-        val gridTop = stripBottomPx + 8f * density
-        val gridBottom = height.toFloat() - 8f * density
+        val gridTop = stripBottomPx + 4f * density
+        val gridBottom = height.toFloat() - 4f * density
         val gridHeight = gridBottom - gridTop
 
-        val rowHeight = gridHeight / rows.size
+        // 3 letter rows + 1 function row (space/backspace/enter).
+        val rowHeight = gridHeight / 4f
         labelPaint.textSize = rowHeight * 0.4f
 
-        for ((rowIndex, row) in rows.withIndex()) {
+        for ((rowIndex, row) in letterRows.withIndex()) {
             val keyWidth = width.toFloat() / row.length
             val top = gridTop + rowIndex * rowHeight
             val bottom = top + rowHeight
             for ((colIndex, char) in row.withIndex()) {
                 val left = colIndex * keyWidth
                 val right = left + keyWidth
-                keyRect.set(left + 2f, top + 2f, right - 2f, bottom - 2f)
-                canvas.drawRoundRect(keyRect, 8f, 8f, keyPaint)
-                canvas.drawRoundRect(keyRect, 8f, 8f, keyBorderPaint)
-                canvas.drawText(
-                    char.toString(),
-                    keyRect.centerX(),
-                    keyRect.centerY() - (labelPaint.ascent() + labelPaint.descent()) / 2,
-                    labelPaint
+                keys.add(
+                    Key(
+                        KeyAction.Character(char),
+                        char.toString(),
+                        RectF(left + 2f, top + 2f, right - 2f, bottom - 2f)
+                    )
                 )
             }
         }
+
+        // Function row: backspace | space (wide) | enter.
+        val funcTop = gridTop + 3 * rowHeight
+        val funcBottom = funcTop + rowHeight
+        val backspaceWidth = width * 0.25f
+        val enterWidth = width * 0.25f
+        val spaceWidth = width - backspaceWidth - enterWidth
+
+        keys.add(
+            Key(
+                KeyAction.Backspace, "⌫",
+                RectF(2f, funcTop + 2f, backspaceWidth - 2f, funcBottom - 2f)
+            )
+        )
+        keys.add(
+            Key(
+                KeyAction.Space, "␣",
+                RectF(backspaceWidth + 2f, funcTop + 2f, backspaceWidth + spaceWidth - 2f, funcBottom - 2f)
+            )
+        )
+        keys.add(
+            Key(
+                KeyAction.Enter, "⏎",
+                RectF(backspaceWidth + spaceWidth + 2f, funcTop + 2f, width - 2f, funcBottom - 2f)
+            )
+        )
     }
+
+    override fun onDraw(canvas: Canvas) {
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
+
+        for (key in keys) {
+            val paint = if (key === pressedKey) keyPressedPaint else keyPaint
+            canvas.drawRoundRect(key.rect, 8f, 8f, paint)
+            canvas.drawRoundRect(key.rect, 8f, 8f, keyBorderPaint)
+            canvas.drawText(
+                key.label,
+                key.rect.centerX(),
+                key.rect.centerY() - (labelPaint.ascent() + labelPaint.descent()) / 2,
+                labelPaint
+            )
+        }
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                pressedKey = keyAt(event.x, event.y)
+                invalidate()
+                return pressedKey != null
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val current = keyAt(event.x, event.y)
+                if (current !== pressedKey) {
+                    pressedKey = current
+                    invalidate()
+                }
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                val released = pressedKey
+                pressedKey = null
+                invalidate()
+                if (released != null) {
+                    onKeyListener?.onKey(released.action)
+                    return true
+                }
+                return false
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                pressedKey = null
+                invalidate()
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun keyAt(x: Float, y: Float): Key? = keys.firstOrNull { it.rect.contains(x, y) }
 
     override fun onDetachedFromWindow() {
         stopFrameTiming()

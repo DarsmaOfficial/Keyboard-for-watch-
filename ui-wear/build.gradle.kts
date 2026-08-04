@@ -22,6 +22,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":ime-core"))
     // Phase 0/1/2: plain View + Canvas only.
     // androidx.dynamicanimation (spring physics, 31 KB) is added in Phase 3 — not yet.
     // HARD RULE (spec §8.0): this module must never depend on androidx.compose.* —
