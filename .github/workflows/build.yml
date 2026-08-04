@@ -24,14 +24,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # ubuntu-latest runners ship a pre-installed Android SDK (ANDROID_HOME already set,
+      # includes recent platforms/build-tools). android-actions/setup-android is unmaintained
+      # and was observed to hang indefinitely in this project — do not reintroduce it.
+      - name: Install required SDK packages
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.1.0" "platform-tools"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
 
       - name: Verify no arm64 libs and no androidx.compose deps in :app / :ui-wear (spec §8.0, §3 item 2)
         run: |
