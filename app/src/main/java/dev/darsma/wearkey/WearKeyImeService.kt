@@ -120,7 +120,12 @@ class WearKeyImeService : InputMethodService() {
                     // Device reports mSupportsSwitchingToNextInputMethod=true (spec §5.5) — use
                     // the real subtype-cycling API rather than mutating the layout directly, so
                     // the system stays the source of truth and remembers the choice per field.
-                    switchToNextInputMethod(false)
+                    //
+                    // onlyCurrentIme MUST be true: with false, the framework cycles across ALL
+                    // enabled IMEs and hands control to Gboard instead of switching our own
+                    // en-US <-> ru-RU subtypes (confirmed on-device 2026-08-04 — tapping the
+                    // language key silently made Gboard the active IME).
+                    switchToNextInputMethod(true)
                 }
             }
         } finally {
