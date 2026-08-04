@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Spec §5.5: subtypes must use InputMethodSubtype (the real Android mechanism), not a bespoke
+  in-app toggle, so the OS language picker and per-app subtype memory work correctly.
+  Only en + ru per MVP scope (spec §11, v0.1 item 4). More subtypes land only after a
+  per-language dictionary license audit passes (spec §4.3) — layout-only subtypes without a
+  dictionary are still fine to add later.
+-->
+<!-- android:settingsActivity intentionally omitted until Phase 5 ships SettingsActivity —
+     pointing this at a nonexistent class would make "Language and input" settings crash. -->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:supportsSwitchingToNextInputMethod="true">
+    <subtype
+        android:label="@string/subtype_en_us"
+        android:imeSubtypeLocale="en_US"
+        android:languageTag="en-US"
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true" />
+    <subtype
+        android:label="@string/subtype_ru_ru"
+        android:imeSubtypeLocale="ru_RU"
+        android:languageTag="ru-RU"
+        android:imeSubtypeMode="keyboard" />
+</input-method>

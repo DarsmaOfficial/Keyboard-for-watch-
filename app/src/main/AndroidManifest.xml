@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Spec §3 item 3/5: no android.permission.INTERNET, no RECORD_AUDIO — ever, not even
+      as an optional/future feature. This app is offline and touch-only by design.
+    -->
+
+    <uses-feature
+        android:name="android.hardware.type.watch"
+        android:required="true" />
+    <!-- Spec §2: no rotary input on this hardware; do not declare rotaryencoder feature. -->
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <!--
+          Entry point 1 (spec §4.5): classic InputMethodService, handles standard EditText
+          fields. android:directBootAware intentionally OMITTED — Gboard's own ServiceInfo
+          reports directBootAware=false on this device and no lock credential is even set
+          (verified 2026-08-04); adding it would be unused complexity (spec §2.1).
+        -->
+        <service
+            android:name=".WearKeyImeService"
+            android:label="@string/ime_label"
+            android:permission="android.permission.BIND_INPUT_METHOD"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+
+        <!--
+          Entry point 2 (spec §4.5): Wear OS routes most real input (notification replies,
+          WhatsApp, browser fields) through RemoteInputActivity, which launches an activity
+          declaring LAUNCH_KEYBOARD — NOT the InputMethodService. Without this, the keyboard
+          is invisible in those flows even though it is installed and enabled.
+          Deliberately NOT declaring LAUNCH_HANDWRITING / DRAW_EMOJI / RECOGNIZE_SPEECH — a
+          declared-but-unhandled filter is worse than an absent one (spec §4.5), and voice
+          input is permanently out of scope (spec §3 item 5).
+        -->
+        <activity
+            android:name=".LaunchKeyboardActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+            <intent-filter>
+                <action android:name="com.google.android.wearable.action.LAUNCH_KEYBOARD" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>

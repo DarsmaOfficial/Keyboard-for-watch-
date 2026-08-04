@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WearKey</string>
+    <string name="ime_label">WearKey</string>
+    <string name="subtype_en_us">Английский (США)</string>
+    <string name="subtype_ru_ru">Русский</string>
+</resources>

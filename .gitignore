@@ -1,0 +1,24 @@
+# Build outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+build/
+.gradle/
+local.properties
+captures/
+.cxx/
+
+# Signing — never commit (spec §13: irreversible if leaked or lost)
+*.jks
+*.keystore
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Android Studio generated
+/*/build/
+/*/local.properties
