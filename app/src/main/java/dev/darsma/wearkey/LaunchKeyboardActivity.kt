@@ -79,10 +79,17 @@ class LaunchKeyboardActivity : Activity() {
     }
 
     private fun remoteInputsFromIntent(): Array<RemoteInput> {
+        // android.app.RemoteInput has no public EXTRA_REMOTE_INPUTS constant (that constant
+        // lives only on androidx.core.app.RemoteInput, which we don't depend on to avoid
+        // pulling androidx.core into this activity). The wire format is stable AOSP-wide.
         @Suppress("DEPRECATION")
-        val parcelables = intent.getParcelableArrayExtra(RemoteInput.EXTRA_REMOTE_INPUTS)
+        val parcelables = intent.getParcelableArrayExtra(REMOTE_INPUTS_EXTRA)
         return parcelables?.filterIsInstance<RemoteInput>()?.toTypedArray() ?: emptyArray()
     }
 
     private fun remoteInputKey(): String? = remoteInputsFromIntent().firstOrNull()?.resultKey
+
+    companion object {
+        private const val REMOTE_INPUTS_EXTRA = "android.remoteinput.extraRemoteInputs"
+    }
 }
