@@ -212,7 +212,11 @@ class KeyGridView @JvmOverloads constructor(
         // settings to change language is unusable on a watch.
         val funcTop = gridTop + 3 * rowHeight
         val funcBottom = gridBottom
-        val funcYForChord = maxOf(abs(funcTop - circleCenterYInView), abs(funcBottom - circleCenterYInView))
+        // Measure the chord at the row's TOP edge, not its bottom: at the very bottom of the
+        // circle the chord collapses to almost nothing, which squeezed the function keys into an
+        // unusable sliver. Using the top edge keeps them a sane width; the rounded corners of
+        // the keys themselves absorb the small overhang past the glass curve.
+        val funcYForChord = abs(funcTop - circleCenterYInView)
         val funcHalfChord = chordHalfWidth(radius, funcYForChord)
         val funcLeft = (circleCenterX - funcHalfChord).coerceAtLeast(0f) + KEY_EDGE_INSET_PX
         val funcRight = (circleCenterX + funcHalfChord).coerceAtMost(width.toFloat()) - KEY_EDGE_INSET_PX

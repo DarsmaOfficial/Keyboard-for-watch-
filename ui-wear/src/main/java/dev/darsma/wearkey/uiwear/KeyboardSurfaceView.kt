@@ -86,10 +86,11 @@ class KeyboardSurfaceView @JvmOverloads constructor(
 
     companion object {
         /**
-         * Fraction of screen height the keyboard is allowed to occupy. 0.62 leaves ~177px on a
-         * 466px round display — enough for a Wear text field plus its app chrome to remain
-         * visible, while still giving the key grid usable touch targets. Tuned on-device.
+         * Fraction of screen height the keyboard is allowed to occupy. 0.66 leaves ~158px on a
+         * 466px round display — still enough for a Wear text field plus its app chrome to stay
+         * visible, while giving each key row comfortable height. Tuned on-device: below ~0.60
+         * the rows get cramped, above ~0.70 the app's field starts getting pushed off screen.
          */
-        const val KEYBOARD_HEIGHT_FRACTION = 0.62f
+        const val KEYBOARD_HEIGHT_FRACTION = 0.66f
     }
 }
