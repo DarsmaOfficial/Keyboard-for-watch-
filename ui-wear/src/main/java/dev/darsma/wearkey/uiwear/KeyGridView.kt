@@ -9,6 +9,8 @@ import android.util.AttributeSet
 import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.View
+import kotlin.math.abs
+import kotlin.math.sqrt
 
 /**
  * Custom View + Canvas key grid (spec §8.0 — no androidx.compose.* in this module).
@@ -147,34 +149,59 @@ class KeyGridView @JvmOverloads constructor(
         computeLayout()
     }
 
+    /**
+     * Round-display layout (spec §7.1). A rectangular grid on a 466x466 circular screen clips
+     * the outer keys of every row — Q/P, A/L, Z/M literally lose usable area to the bezel, which
+     * is exactly the Fitts's-law failure the spec calls out.
+     *
+     * Fix: each row is fitted to the *chord* of the display circle at that row's vertical
+     * centre, so keys never extend past the visible glass. Rows therefore get progressively
+     * narrower toward the bottom of the screen, and every key stays fully tappable.
+     *
+     * Note this view is positioned in the LOWER part of the display (the keyboard occupies the
+     * bottom ~62% so the app's real field stays visible), so the circle centre sits *above*
+     * this view's own coordinate space — hence [circleCenterYInView] is negative.
+     */
     private fun computeLayout() {
         keys.clear()
         if (width == 0 || height == 0) return
 
         val density = resources.displayMetrics.density
-        // The composition strip is a sibling view above this one (KeyboardSurfaceView is a
-        // vertical LinearLayout), so no vertical space is reserved here any more — this view
-        // gets exactly the area it should fill.
         val gridTop = 2f * density
         val gridBottom = height.toFloat() - 2f * density
         val gridHeight = gridBottom - gridTop
 
-        // 3 letter rows + 1 function row (space/backspace/enter).
+        // 3 letter rows + 1 function row.
         val rowHeight = gridHeight / 4f
-        labelPaint.textSize = rowHeight * 0.4f
+        labelPaint.textSize = rowHeight * 0.40f
+
+        val screenH = resources.displayMetrics.heightPixels.toFloat()
+        val screenW = resources.displayMetrics.widthPixels.toFloat()
+        val radius = minOf(screenW, screenH) / 2f
+        // Where the display's circle centre lies relative to this view's top edge.
+        val circleCenterYInView = radius - (screenH - height)
+        val circleCenterX = width / 2f
 
         for ((rowIndex, row) in letterRows.withIndex()) {
-            val keyWidth = width.toFloat() / row.length
             val top = gridTop + rowIndex * rowHeight
             val bottom = top + rowHeight
+            // Use whichever edge of the row is closer to the bottom of the circle — that's the
+            // narrower chord, and using it guarantees the whole key rect stays inside the glass.
+            val yForChord = maxOf(abs(top - circleCenterYInView), abs(bottom - circleCenterYInView))
+            val halfChord = chordHalfWidth(radius, yForChord)
+            val rowLeft = (circleCenterX - halfChord).coerceAtLeast(0f) + KEY_EDGE_INSET_PX
+            val rowRight = (circleCenterX + halfChord).coerceAtMost(width.toFloat()) - KEY_EDGE_INSET_PX
+            val usableWidth = (rowRight - rowLeft).coerceAtLeast(1f)
+            val keyWidth = usableWidth / row.length
+
             for ((colIndex, char) in row.withIndex()) {
-                val left = colIndex * keyWidth
+                val left = rowLeft + colIndex * keyWidth
                 val right = left + keyWidth
                 keys.add(
                     Key(
                         KeyAction.Character(char),
                         char.toString(),
-                        RectF(left + 2f, top + 2f, right - 2f, bottom - 2f)
+                        RectF(left + KEY_GAP_PX, top + KEY_GAP_PX, right - KEY_GAP_PX, bottom - KEY_GAP_PX)
                     )
                 )
             }
@@ -184,31 +211,44 @@ class KeyGridView @JvmOverloads constructor(
         // Spec §5.5: an in-keyboard language key is required, not optional — opening system
         // settings to change language is unusable on a watch.
         val funcTop = gridTop + 3 * rowHeight
-        val funcBottom = funcTop + rowHeight
-        val backspaceWidth = width * 0.20f
-        val switchLangWidth = width * 0.16f
-        val enterWidth = width * 0.20f
-        val spaceWidth = width - backspaceWidth - switchLangWidth - enterWidth
+        val funcBottom = gridBottom
+        val funcYForChord = maxOf(abs(funcTop - circleCenterYInView), abs(funcBottom - circleCenterYInView))
+        val funcHalfChord = chordHalfWidth(radius, funcYForChord)
+        val funcLeft = (circleCenterX - funcHalfChord).coerceAtLeast(0f) + KEY_EDGE_INSET_PX
+        val funcRight = (circleCenterX + funcHalfChord).coerceAtMost(width.toFloat()) - KEY_EDGE_INSET_PX
+        val funcWidth = (funcRight - funcLeft).coerceAtLeast(1f)
 
-        var x = 0f
+        val backspaceWidth = funcWidth * 0.22f
+        val switchLangWidth = funcWidth * 0.18f
+        val enterWidth = funcWidth * 0.22f
+        val spaceWidth = funcWidth - backspaceWidth - switchLangWidth - enterWidth
+
+        var x = funcLeft
         keys.add(
-            Key(KeyAction.Backspace, "⌫", RectF(x + 2f, funcTop + 2f, x + backspaceWidth - 2f, funcBottom - 2f))
+            Key(KeyAction.Backspace, "⌫",
+                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + backspaceWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
         x += backspaceWidth
         keys.add(
-            Key(
-                KeyAction.SwitchLanguage, switchLanguageLabel(),
-                RectF(x + 2f, funcTop + 2f, x + switchLangWidth - 2f, funcBottom - 2f)
-            )
+            Key(KeyAction.SwitchLanguage, switchLanguageLabel(),
+                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + switchLangWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
         x += switchLangWidth
         keys.add(
-            Key(KeyAction.Space, "␣", RectF(x + 2f, funcTop + 2f, x + spaceWidth - 2f, funcBottom - 2f))
+            Key(KeyAction.Space, "␣",
+                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + spaceWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
         x += spaceWidth
         keys.add(
-            Key(KeyAction.Enter, "⏎", RectF(x + 2f, funcTop + 2f, width - 2f, funcBottom - 2f))
+            Key(KeyAction.Enter, "⏎",
+                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, funcRight - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
+    }
+
+    /** Half-width of the horizontal chord of a circle of [radius] at vertical offset [dy]. */
+    private fun chordHalfWidth(radius: Float, dy: Float): Float {
+        val d = abs(dy).coerceAtMost(radius)
+        return sqrt(radius * radius - d * d)
     }
 
     private fun switchLanguageLabel(): String = when (layout) {
@@ -221,8 +261,9 @@ class KeyGridView @JvmOverloads constructor(
 
         for (key in keys) {
             val paint = if (key === pressedKey) keyPressedPaint else keyPaint
-            canvas.drawRoundRect(key.rect, 8f, 8f, paint)
-            canvas.drawRoundRect(key.rect, 8f, 8f, keyBorderPaint)
+            val radius = minOf(key.rect.width(), key.rect.height()) * 0.28f
+            canvas.drawRoundRect(key.rect, radius, radius, paint)
+            canvas.drawRoundRect(key.rect, radius, radius, keyBorderPaint)
             canvas.drawText(
                 key.label,
                 key.rect.centerX(),
@@ -266,11 +307,45 @@ class KeyGridView @JvmOverloads constructor(
         return false
     }
 
-    private fun keyAt(x: Float, y: Float): Key? = keys.firstOrNull { it.rect.contains(x, y) }
+    /**
+     * Hit-testing is deliberately more forgiving than the drawn rect: a tap that lands in the
+     * gap between keys, or just outside the row's chord near the bezel, resolves to the nearest
+     * key centre instead of being swallowed. This is the cheap half of spec §7.1's
+     * "extend outer-key hit regions to the physical display edge" — the full bivariate Gaussian
+     * touch model lands in Phase 2 proper.
+     */
+    private fun keyAt(x: Float, y: Float): Key? {
+        keys.firstOrNull { it.rect.contains(x, y) }?.let { return it }
+
+        var best: Key? = null
+        var bestDistSq = Float.MAX_VALUE
+        for (key in keys) {
+            val cx = key.rect.centerX()
+            val cy = key.rect.centerY()
+            // Only consider keys on roughly the same row, so a sloppy horizontal tap never
+            // jumps a row vertically.
+            if (abs(cy - y) > key.rect.height()) continue
+            val dx = cx - x
+            val dy = cy - y
+            val distSq = dx * dx + dy * dy
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq
+                best = key
+            }
+        }
+        return best
+    }
 
     override fun onDetachedFromWindow() {
         stopFrameTiming()
         Choreographer.getInstance().removeFrameCallback(frameCallback)
         super.onDetachedFromWindow()
+    }
+
+    companion object {
+        /** Gap drawn between adjacent keys. Small — touch slop is handled in [keyAt] instead. */
+        private const val KEY_GAP_PX = 3f
+        /** Keeps the outermost keys clear of the physical bezel curve. */
+        private const val KEY_EDGE_INSET_PX = 2f
     }
 }
