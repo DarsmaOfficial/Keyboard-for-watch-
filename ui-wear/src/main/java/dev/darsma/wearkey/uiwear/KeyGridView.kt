@@ -168,12 +168,19 @@ class KeyGridView @JvmOverloads constructor(
 
         val density = resources.displayMetrics.density
         val gridTop = 2f * density
-        val gridBottom = height.toFloat() - 2f * density
+        // Stop short of the very bottom of the round display: down there the circle's chord
+        // narrows so fast that a full-width function row cannot fit, and keys placed there are
+        // half-hidden by the bezel curve. Leaving this margin keeps every row usably wide.
+        val bottomMarginPx = 14f * density
+        val gridBottom = height.toFloat() - bottomMarginPx
         val gridHeight = gridBottom - gridTop
 
-        // 3 letter rows + 1 function row.
-        val rowHeight = gridHeight / 4f
-        labelPaint.textSize = rowHeight * 0.40f
+        // 3 letter rows + 1 function row. The function row is deliberately shorter than the
+        // letter rows: its keys are large-target symbols, while letter keys are what actually
+        // need the height on a small round display.
+        val funcRowHeight = gridHeight * 0.21f
+        val rowHeight = (gridHeight - funcRowHeight) / 3f
+        labelPaint.textSize = rowHeight * 0.46f
 
         val screenH = resources.displayMetrics.heightPixels.toFloat()
         val screenW = resources.displayMetrics.widthPixels.toFloat()
@@ -211,7 +218,7 @@ class KeyGridView @JvmOverloads constructor(
         // Spec §5.5: an in-keyboard language key is required, not optional — opening system
         // settings to change language is unusable on a watch.
         val funcTop = gridTop + 3 * rowHeight
-        val funcBottom = gridBottom
+        val funcBottom = funcTop + funcRowHeight
         // Measure the chord at the row's TOP edge, not its bottom: at the very bottom of the
         // circle the chord collapses to almost nothing, which squeezed the function keys into an
         // unusable sliver. Using the top edge keeps them a sane width; the rounded corners of
