@@ -116,20 +116,30 @@ class WearKeyImeService : InputMethodService() {
                         android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_ENTER)
                     )
                 }
-                KeyGridView.KeyAction.SwitchLanguage -> {
-                    // Device reports mSupportsSwitchingToNextInputMethod=true (spec §5.5) — use
-                    // the real subtype-cycling API rather than mutating the layout directly, so
-                    // the system stays the source of truth and remembers the choice per field.
-                    //
-                    // onlyCurrentIme MUST be true: with false, the framework cycles across ALL
-                    // enabled IMEs and hands control to Gboard instead of switching our own
-                    // en-US <-> ru-RU subtypes (confirmed on-device 2026-08-04 — tapping the
-                    // language key silently made Gboard the active IME).
-                    switchToNextInputMethod(true)
-                }
+                KeyGridView.KeyAction.SwitchLanguage -> switchLanguage()
             }
         } finally {
             ic.endBatchEdit()
+        }
+    }
+
+    /**
+     * Spec §5.5: prefer the real Android mechanism so the OS language picker and per-field
+     * subtype memory stay authoritative. `onlyCurrentIme = true` is required — with `false` the
+     * framework cycles across ALL enabled IMEs and hands control to Gboard entirely (confirmed
+     * on-device 2026-08-04).
+     *
+     * Fallback: if the framework declines to switch (returns false — e.g. it only registered a
+     * single subtype, or the user disabled one in system settings), swap the grid layout
+     * directly so the key is never a dead control. The visible layout is what the user is
+     * actually asking for; deferring to the system is the mechanism, not the goal.
+     */
+    private fun switchLanguage() {
+        if (switchToNextInputMethod(true)) return
+        val grid = surfaceView?.keyGrid ?: return
+        grid.layout = when (grid.layout) {
+            KeyGridView.Layout.EN_US -> KeyGridView.Layout.RU_RU
+            KeyGridView.Layout.RU_RU -> KeyGridView.Layout.EN_US
         }
     }
 

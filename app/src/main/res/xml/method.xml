@@ -5,20 +5,32 @@
   Only en + ru per MVP scope (spec §11, v0.1 item 4). More subtypes land only after a
   per-language dictionary license audit passes (spec §4.3) — layout-only subtypes without a
   dictionary are still fine to add later.
+
+  IMPORTANT (found on-device 2026-08-04): without explicit android:subtypeId values the
+  framework only registered ONE of the two subtypes (dumpsys input_method listed just
+  "Русский"), so switchToNextInputMethod had nothing to cycle to and silently did nothing.
+  Explicit stable subtype IDs fix that and also keep the user's per-field subtype choice
+  stable across app updates.
+
+  android:settingsActivity intentionally omitted until Phase 5 ships SettingsActivity —
+  pointing this at a nonexistent class would make "Language and input" settings crash.
 -->
-<!-- android:settingsActivity intentionally omitted until Phase 5 ships SettingsActivity —
-     pointing this at a nonexistent class would make "Language and input" settings crash. -->
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
     android:supportsSwitchingToNextInputMethod="true">
     <subtype
+        android:subtypeId="0x01"
         android:label="@string/subtype_en_us"
         android:imeSubtypeLocale="en_US"
         android:languageTag="en-US"
         android:imeSubtypeMode="keyboard"
-        android:isAsciiCapable="true" />
+        android:isAsciiCapable="true"
+        android:overridesImplicitlyEnabledSubtype="false" />
     <subtype
+        android:subtypeId="0x02"
         android:label="@string/subtype_ru_ru"
         android:imeSubtypeLocale="ru_RU"
         android:languageTag="ru-RU"
-        android:imeSubtypeMode="keyboard" />
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="false"
+        android:overridesImplicitlyEnabledSubtype="false" />
 </input-method>
