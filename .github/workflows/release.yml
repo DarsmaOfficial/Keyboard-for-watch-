@@ -126,6 +126,11 @@ jobs:
             A free, fully offline keyboard for Wear OS. No account, no tiers, no telemetry,
             no network permission, no microphone.
 
+            > **Upgrading from v0.1.0?** That release was debug-signed, before the project had a
+            > release key. This build is signed properly, so Android will refuse to install it
+            > over the old one. Uninstall first — `adb uninstall dev.darsma.wearkey` — then
+            > install this APK. This is a one-time step; future updates install normally.
+
             ### Install
 
             Download the APK below and side-load it:
