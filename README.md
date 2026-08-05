@@ -46,8 +46,21 @@ Early, but usable for typing. What works today:
   OTP- and card-number-looking entries
 - Password fields are masked — plaintext never enters the preview buffer
 
-Not done yet: autocorrect, glide typing, emoji layer, haptics, settings screen, TalkBack polish.
+- Shift with caps lock, and a two-page symbol/number layer
+- Vibration feedback, with an intensity setting including full off
+- Settings screen with an offline "open source licences" viewer
+
+Not done yet: autocorrect, glide typing, emoji layer, press animations.
 See [`CHANGELOG.md`](CHANGELOG.md).
+
+### Known limitation: TalkBack
+
+The key grid is drawn on a `Canvas`, which means the system sees it as one opaque view rather
+than a set of keys. Individual key presses are announced, but **touch-exploration mode does not
+work properly** — sliding a finger to hear keys before committing them will not behave as it
+should. Fixing this needs a virtual accessibility node hierarchy
+(`AccessibilityNodeProvider`), which is not implemented yet. If you rely on TalkBack, this
+keyboard is not usable for you today.
 
 ---
 
