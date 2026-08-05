@@ -28,7 +28,7 @@ import javax.crypto.spec.GCMParameterSpec
  *  - **Sensitive entries are never written.** OTPs and card numbers expire in minutes by
  *    design; persisting them across reboots would defeat that.
  */
-class EncryptedClipboardPersistence(context: Context) {
+class EncryptedClipboardPersistence(private val context: Context) {
 
     // Clipboard data belongs in credential-protected storage (spec §6). There is no
     // createCredentialProtectedStorageContext() to call — an ordinary Context already IS
