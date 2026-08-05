@@ -96,26 +96,53 @@ jobs:
             exit 1
           fi
 
-      - name: Verify dictionary size and frequency column (spec §4.2 heap budget)
+      - name: Verify dictionary word lists and indexes agree (spec §4.2 heap budget)
         run: |
-          # The 8 MB java-heap gate (spec §14) is set by how many words SymSpell holds, and
-          # SymSpell's delete-variant table grows worse than linearly. A revision that shipped
-          # 30 000 words instead of the budgeted 10 000 measured 39.8 MB of Dalvik heap on the
-          # watch — nearly five times the gate — and nothing in CI noticed. This is that check.
+          # The 8 MB java-heap gate (spec §14) is set by the number of words in the index. A
+          # revision that shipped 30 000 words instead of the budgeted 10 000 measured 39.8 MB of
+          # Dalvik heap on the watch and nothing in CI noticed, hence this gate.
           FAIL=0
-          for f in app/src/main/assets/dictionaries/*.txt; do
+          for f in dictionaries/*.txt; do
             LINES=$(wc -l < "$f")
             echo "$f: $LINES words"
             if [ "$LINES" -gt 10000 ]; then
               echo "::error::$f has $LINES words; the measured heap budget allows 10000"
               FAIL=1
             fi
-            # Every entry must carry a tab-separated frequency. Without it each word loads at
-            # frequency 1.0 and candidate ranking silently becomes arbitrary, which is a quality
-            # regression that no build error would ever surface.
+            # Every entry must carry a tab-separated frequency. Without it each word ends up
+            # equally weighted and candidate ranking silently becomes arbitrary — a quality
+            # regression no build error would ever surface.
             MISSING=$(grep -cv "$(printf '\t')" "$f" || true)
             if [ "$MISSING" -ne 0 ]; then
               echo "::error::$f has $MISSING entries with no frequency column"
+              FAIL=1
+            fi
+          done
+
+          # The committed .bin indexes must be exactly what the committed .txt lists compile to.
+          # If they drift, the app ships a dictionary nobody reviewed.
+          python3 tools/build_index.py dictionaries/en.txt /tmp/en.bin
+          python3 tools/build_index.py dictionaries/ru.txt /tmp/ru.bin
+          for lang in en ru; do
+            if ! cmp -s "/tmp/$lang.bin" "app/src/main/assets/dictionaries/$lang.bin"; then
+              echo "::error::app/src/main/assets/dictionaries/$lang.bin is stale — rerun tools/build_index.py"
+              FAIL=1
+            fi
+          done
+          [ "$FAIL" -eq 0 ]
+
+      - name: Verify dictionary indexes are stored uncompressed so they can be mapped
+        run: |
+          # A compressed asset cannot be memory-mapped: AssetManager only returns a file
+          # descriptor for stored entries. If these ever become deflated, the loader falls back to
+          # extraction and the heap saving silently disappears.
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          FAIL=0
+          for lang in en ru; do
+            METHOD=$(unzip -lv "$APK" "assets/dictionaries/$lang.bin" | awk 'NR==4 {print $3}')
+            echo "$lang.bin storage method: $METHOD"
+            if [ "$METHOD" != "Stored" ]; then
+              echo "::error::assets/dictionaries/$lang.bin is $METHOD, must be Stored (see noCompress)"
               FAIL=1
             fi
           done

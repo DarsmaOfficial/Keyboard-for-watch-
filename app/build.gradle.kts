@@ -31,6 +31,15 @@ android {
         }
     }
 
+    androidResources {
+        // The dictionary indexes are memory-mapped at runtime so they cost mapped pages instead of
+        // Java heap (spec §4.2). A compressed asset cannot be mapped — AssetManager can only hand
+        // back a file descriptor for stored entries — so .bin must be excluded from compression.
+        // These files are already compact primitive tables; leaving them uncompressed costs about
+        // 1.3 MB of APK and saves 15.5 MB of heap.
+        noCompress.add("bin")
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false // enable + tune R8 rules once app is functional (phase 5)

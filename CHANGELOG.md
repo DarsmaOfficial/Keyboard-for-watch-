@@ -17,10 +17,13 @@ is reached.
   equally-close candidates was arbitrary: "helo" offered "halo / held / helm" and never "hello".
   Each word now carries a real frequency, and candidates are ranked by it.
 - **Java heap is back inside its budget.** One resident dictionary measured **39.8 MB** of Dalvik
-  heap on the watch against the specification's 8 MB gate, because the lists shipped 30 000 words
-  where the heap budget was calculated for 10 000. Reduced to 10 000, which is what the design
-  always assumed; `ARCHITECTURE.md` records the measurements and the two `dumpsys` traps that made
-  the earlier numbers misleading.
+  heap on the watch against the specification's 8 MB gate. Two causes, fixed in order: the lists
+  shipped 30 000 words where the budget was calculated for 10 000 (cutting to 10 000 gave 15.5 MB),
+  and SymSpellKt's in-memory delete table costs three Java objects per variant, of which 10 000
+  words generate 68 625. The engine is now a packed binary index that is memory-mapped instead of
+  allocated, so the dictionary occupies clean file-backed pages rather than Java heap.
+  `ARCHITECTURE.md` records every measurement and the two `dumpsys` traps that made the earlier
+  numbers misleading.
 
 ### Changed
 - Word lists are now frequency-ranked rather than length-ranked, so the 10 000 kept words are the
@@ -30,8 +33,18 @@ is reached.
   better than the larger one it replaces.
 - The candidate row offers four words instead of three. "helo" has six neighbours at edit
   distance 1, and at three chips the intended word fell just off the end.
-- CI now fails if a word list exceeds 10 000 entries or loses its frequency column — the heap
-  overrun and the ranking defect were both invisible to every existing gate.
+- CI now fails if a word list exceeds 10 000 entries, loses its frequency column, has a stale
+  compiled index, or packages an index compressed rather than stored. The heap overrun and the
+  ranking defect were both invisible to every existing gate.
+
+### Removed
+- **SymSpellKt.** Used up to v0.3.0 and removed on measurement, not on preference — see above. The
+  keyboard now has no third-party dependency for autocorrect, and the APK contains no MIT-licensed
+  component at all. The symmetric-delete algorithm it implements is still the basis of the
+  replacement and is credited in `THIRD_PARTY_LICENSES.md`.
+- The plain-text word lists no longer ship inside the APK. They are build inputs, kept in
+  `dictionaries/` at the repository root and compiled into the `.bin` indexes, which saves 320 KB of
+  APK and removes a redundant second copy of the same data.
 
 ### Added
 - Clipboard history (spec §6): panel replacing the key grid, one-tap paste, pin/unpin, delete,

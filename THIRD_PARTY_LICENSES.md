@@ -14,10 +14,15 @@ The project's own licence is Apache-2.0 — see [`LICENSE`](LICENSE) and [`NOTIC
 |---|---|---|---|
 | Kotlin standard library (`kotlin-stdlib`) | 2.1.0 | Apache-2.0 | https://github.com/JetBrains/kotlin |
 | `androidx.dynamicanimation` | 1.0.0 | Apache-2.0 | https://developer.android.com/jetpack/androidx |
-| SymSpellKt | 3.4.0 | MIT | https://github.com/Darkrock-Studios/SymSpellKt |
 | English word list (SCOWL, via `wooorm/dictionaries`) | 2020.12.07 | BSD-style | https://github.com/wooorm/dictionaries |
 | Russian word list (Lebedev, via `wooorm/dictionaries`) | 2020 | BSD | https://github.com/wooorm/dictionaries |
 | Word frequency counts (Wortschatz Leipzig Corpora Collection) | eng_news_2020, rus_news_2022 | CC BY 4.0 | https://wortschatz.uni-leipzig.de/en/download |
+
+Note there is no third-party autocorrect library. SymSpellKt (MIT) was used up to v0.3.0 and
+removed after measurement: its in-memory delete table costs three Java objects per variant, which
+measured 15.5 MB of heap on the watch against an 8 MB gate. The replacement is a packed index in
+this project's own code (`dict/WordIndex.kt`) read through `mmap`, which spec §4.2 pre-authorised
+for exactly this outcome. The word data itself is unchanged.
 
 The word lists are derived from the upstream Hunspell `.dic` files: affix flags stripped, entries
 lowercased and de-duplicated, then frequency-ranked and capped at the 10 000 most common words per
@@ -76,14 +81,19 @@ The full Apache-2.0 text is reproduced in [`LICENSE`](LICENSE).
 These are **not yet shipped**. They are recorded here so the obligations are known before the
 code lands, and so nothing is added without an audit.
 
-### SymSpellKt (planned, for autocorrect) — MIT
+### SymSpellKt — MIT — REMOVED after v0.3.0, no longer in the APK
 
-A three-layer attribution chain, all three notices required:
+Retained for the record only. The library shipped in v0.3.0 and was removed once its heap cost was
+measured on the device (15.5 MB against an 8 MB gate); the replacement is this project's own
+`dict/WordIndex.kt`. No SymSpellKt code remains in the APK, so its notice is no longer a
+redistribution obligation — but the *algorithm* it implements is still the basis of the
+replacement, and crediting that is simply correct:
 
 ```
 Copyright (c) 2024 Adam Brown          (Kotlin Multiplatform port)
 Copyright (c) 2019 Lucky Sharma        (Java implementation it derives from)
-Wolf Garbe / SymSpell                  (original algorithm and reference implementation)
+Wolf Garbe / SymSpell                  (original symmetric-delete algorithm; the packed index
+                                        in dict/WordIndex.kt implements the same approach)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -1,92 +1,95 @@
 package dev.darsma.wearkey.dict
 
-import com.darkrockstudios.symspellkt.common.Verbosity
-import com.darkrockstudios.symspellkt.impl.SymSpell
+import java.nio.ByteBuffer
 
 /**
  * Spell-check / autocorrect engine (spec §7.2).
  *
- * Uses **SymSpellKt** (MIT): pure Kotlin, symmetric-delete algorithm, O(1) lookups. Chosen over
- * the alternatives for reasons recorded in the spec:
- *  - Hunspell as a *runtime* would need NDK + JNI, ~8 MB heap, and reintroduces the 32-bit ABI
- *    risk this project avoids by shipping no native code at all.
- *  - Norvig-style candidate generation allocates heavily (~12 MB) and causes GC pauses on the
- *    main thread — fatal for something that runs on every keystroke.
+ * Backed by [WordIndex]: a packed binary index that the Android layer memory-maps, so a resident
+ * dictionary costs essentially no Java heap. The history behind that choice matters, because the
+ * obvious library was tried first and measured:
  *
- * `maxEditDistance = 1` is deliberate and not tunable upward (spec §4.2): distance 2 costs
- * 15-16 MB per language, which would blow the 12 MB heap budget on its own.
+ * | Configuration | Dalvik heap on the watch |
+ * |---|---|
+ * | SymSpellKt, 30 000 words | 39.8 MB |
+ * | SymSpellKt, 10 000 words | 15.5 MB |
+ * | this mapped index, 10 000 words | ~0 (file-backed pages) |
  *
- * Pure Kotlin/JVM, so it is unit-testable without a device. The Android layer only supplies the
- * word list and decides when to apply a correction.
+ * The gate in spec §14 is 8 MB, and §4.2 pre-authorised exactly this fallback: benchmark
+ * SymSpellKt's real retained heap, and if it does not fit, write a flat index with a genuine mmap
+ * path. SymSpellKt's cost is structural — `Map<Long, ArrayList<String>>` for the delete table
+ * means three Java objects per delete variant, and 10 000 words generate 68 625 variants — so no
+ * amount of tuning would have brought it inside the budget.
+ *
+ * `maxEditDistance` is fixed at 1 and is not tunable (spec §4.2). Distance 2 multiplies the
+ * variant count by roughly four and was rejected outright.
+ *
+ * Everything here is pure Kotlin/JVM with no Android imports, so it is unit-testable on the host.
  */
-class SpellEngine(
-    private val maxEditDistance: Double = 1.0
-) {
+class SpellEngine {
 
-    private var checker: SymSpell? = null
+    private var index: WordIndex? = null
 
-    /** True once a word list is loaded and lookups will return something useful. */
+    /** True once an index is loaded and lookups will return something useful. */
     val isReady: Boolean
-        get() = checker != null
+        get() = index != null
+
+    /** Number of words currently resident, for diagnostics and tests. */
+    val wordCount: Int
+        get() = index?.size ?: 0
 
     /**
-     * Loads a word list. Each entry is `word` or `word<TAB>frequency`; frequency defaults to 1
-     * when absent. Calling this again swaps languages — the previous dictionary is dropped, so
-     * only one stays resident (spec §4.2: one resident dictionary, bounded heap).
+     * Loads a packed index built by `tools/build_index.py`.
+     *
+     * Calling this again swaps languages: the previous index is dropped, so exactly one stays
+     * resident (spec §4.2). An unrecognised or truncated buffer leaves the engine unloaded rather
+     * than throwing — the keyboard must degrade to layout-only typing, never die (spec §11).
      */
-    fun load(entries: Sequence<String>) {
-        val spellChecker = SymSpell()
-        var loaded = 0
-
-        entries.forEach { raw ->
-            val line = raw.trim()
-            if (line.isEmpty() || line.startsWith("#")) return@forEach
-            val parts = line.split('\t', limit = 2)
-            val word = parts[0].trim().lowercase()
-            if (word.isEmpty()) return@forEach
-            val frequency = parts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: 1.0
-            runCatching { spellChecker.createDictionaryEntry(word, frequency) }
-                .onSuccess { loaded++ }
-        }
-
-        checker = if (loaded > 0) spellChecker else null
+    fun load(buffer: ByteBuffer) {
+        index = WordIndex.from(buffer)
     }
 
-    /** Drops the dictionary and frees its memory. */
+    /** Drops the index. Mapped pages become reclaimable as soon as the buffer is released. */
     fun unload() {
-        checker = null
+        index = null
     }
 
     /**
-     * Correction candidates for [word], best first. Returns an empty list when no dictionary is
-     * loaded — the keyboard degrades to layout-only input and never crashes (spec §11 failure
-     * modes: a keyboard that dies leaves the user unable to type at all).
+     * Correction candidates for [word], best first. Empty when no index is loaded.
+     *
+     * Candidates arrive pre-ranked by corpus frequency because the index stores words in
+     * descending frequency order. This is what fixes the original on-device defect: with every
+     * word weighted equally, "helo" offered "halo / held / helm" and never "hello".
      */
     fun suggest(word: String): List<String> {
         if (word.isBlank()) return emptyList()
-        val spellChecker = checker ?: return emptyList()
+        val idx = index ?: return emptyList()
         return runCatching {
-            spellChecker.lookup(word.lowercase(), Verbosity.Closest, maxEditDistance)
-                .map { it.term }
-                .filter { it.isNotBlank() }
-                .distinct()
-                .take(MAX_SUGGESTIONS)
+            idx.lookup(word.lowercase(), MAX_SUGGESTIONS)
         }.getOrDefault(emptyList())
     }
 
     /**
      * The single best correction, or null when the word is already fine or nothing is close
-     * enough. Deliberately conservative: "correcting" a word the user actually meant is worse
-     * than leaving a typo alone, especially on a watch where undoing is expensive.
+     * enough. Deliberately conservative: "correcting" a word the user actually meant is worse than
+     * leaving a typo alone, especially on a watch where undoing costs several taps.
+     *
+     * Note the keyboard never applies this automatically — the candidate row offers words and the
+     * user taps one. This exists for callers that want a single answer.
      */
     fun bestCorrection(word: String): String? {
         if (word.isBlank()) return null
-        if (word.any { !it.isLetter() }) return null // don't touch mixed alphanumerics
-        val suggestions = suggest(word)
-        if (suggestions.isEmpty()) return null
-        val top = suggestions.first()
-        if (top.equals(word, ignoreCase = true)) return null // already a dictionary word
-        return top
+        if (word.any { !it.isLetter() }) return null // leave mixed alphanumerics alone
+        val idx = index ?: return null
+        val lower = word.lowercase()
+        if (idx.contains(lower)) return null // already a dictionary word
+        return suggest(lower).firstOrNull()
+    }
+
+    /** True when [word] is in the resident dictionary. */
+    fun isKnown(word: String): Boolean {
+        val idx = index ?: return false
+        return idx.contains(word.lowercase())
     }
 
     companion object {
@@ -96,8 +99,8 @@ class SpellEngine(
          * Four rather than three, decided from on-device behaviour: typing "helo" produces
          * help / held / hero / hello / helm / halo, all at edit distance 1 and correctly ordered
          * by real frequency — but at three chips the word the user almost certainly meant fell
-         * just off the end. A 466 px display fits four chips legibly, and offering one more costs
-         * nothing in heap since the candidates are computed either way.
+         * just off the end. A 466 px display fits four legibly, and the candidates are computed
+         * either way.
          */
         const val MAX_SUGGESTIONS = 4
     }

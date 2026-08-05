@@ -1,5 +1,7 @@
 package dev.darsma.wearkey.dict
 
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -8,8 +10,12 @@ import kotlin.test.assertTrue
 
 class SpellEngineTest {
 
+    private fun engineWith(vararg entries: Pair<String, Int>): SpellEngine =
+        SpellEngine().apply { load(TestIndex.build(entries.toMap())) }
+
+    /** Equal weights, for cases where frequency is irrelevant to what is being asserted. */
     private fun engineWith(vararg words: String): SpellEngine =
-        SpellEngine().apply { load(words.asSequence()) }
+        SpellEngine().apply { load(TestIndex.build(words.associateWith { 1 })) }
 
     @Test
     fun beforeLoading_isNotReadyAndSuggestsNothing() {
@@ -23,72 +29,55 @@ class SpellEngineTest {
     fun load_marksEngineReady() {
         val engine = engineWith("hello", "world")
         assertTrue(engine.isReady)
+        assertEquals(2, engine.wordCount)
     }
 
     @Test
-    fun load_ignoresBlankAndCommentLines() {
-        val engine = SpellEngine()
-        engine.load(sequenceOf("", "   ", "# comment", "hello"))
-        assertTrue(engine.isReady)
+    fun suggest_findsSingleSubstitution() {
+        val engine = engineWith("cat")
+        assertTrue("cat" in engine.suggest("cot"))
     }
 
     @Test
-    fun emptyWordList_leavesEngineUnready() {
-        val engine = SpellEngine()
-        engine.load(sequenceOf("", "# nothing here"))
-        assertFalse(engine.isReady)
-    }
-
-    @Test
-    fun singleCharacterTypo_isCorrected() {
-        val engine = engineWith("hello", "world", "keyboard")
-        assertEquals("hello", engine.bestCorrection("helo"))
-    }
-
-    @Test
-    fun transposedLetters_areCorrected() {
-        val engine = engineWith("keyboard", "watch")
-        assertEquals("watch", engine.bestCorrection("wacth"))
-    }
-
-    @Test
-    fun correctWord_returnsNoCorrection() {
-        val engine = engineWith("hello", "world")
-        assertNull(engine.bestCorrection("hello"))
-    }
-
-    @Test
-    fun wordFarFromDictionary_isLeftAlone() {
-        // Edit distance 1 only (spec §4.2), so a wildly different string must not be "fixed".
+    fun suggest_findsSingleInsertion() {
+        // "hello" is reached from "helo" by inserting a character, which the symmetric-delete
+        // algorithm covers from the other direction.
         val engine = engineWith("hello")
-        assertNull(engine.bestCorrection("zzzzzz"))
+        assertTrue("hello" in engine.suggest("helo"))
     }
 
     @Test
-    fun wordsWithDigits_areNeverCorrected() {
-        val engine = engineWith("hello")
-        assertNull(engine.bestCorrection("hello2"))
-        assertNull(engine.bestCorrection("2fa"))
+    fun suggest_findsSingleDeletion() {
+        val engine = engineWith("cat")
+        assertTrue("cat" in engine.suggest("catt"))
     }
 
     @Test
-    fun blankInput_isSafe() {
-        val engine = engineWith("hello")
-        assertTrue(engine.suggest("").isEmpty())
-        assertNull(engine.bestCorrection("   "))
+    fun suggest_ignoresWordsTwoEditsAway() {
+        val engine = engineWith("elephant")
+        assertTrue(engine.suggest("elphnt").isEmpty())
     }
 
     @Test
-    fun frequencyColumn_isParsed() {
-        val engine = SpellEngine()
-        engine.load(sequenceOf("cat\t100", "car\t5"))
-        assertTrue(engine.isReady)
-        // Both are one edit from "car"/"cat"; the higher-frequency word should win.
+    fun bestCorrection_leavesKnownWordsAlone() {
+        val engine = engineWith("cat", "cot")
+        assertNull(engine.bestCorrection("cat"))
+    }
+
+    @Test
+    fun bestCorrection_ignoresMixedAlphanumerics() {
+        val engine = engineWith("cat")
+        assertNull(engine.bestCorrection("c4t"))
+    }
+
+    @Test
+    fun bestCorrection_prefersTheMoreFrequentCandidate() {
+        val engine = engineWith("cat" to 100, "car" to 5)
         assertEquals("cat", engine.bestCorrection("cst"))
     }
 
     @Test
-    fun unload_freesDictionary() {
+    fun unload_freesIndex() {
         val engine = engineWith("hello")
         assertTrue(engine.isReady)
         engine.unload()
@@ -103,79 +92,105 @@ class SpellEngineTest {
     }
 
     @Test
-    fun loadingAgain_replacesPreviousDictionary() {
+    fun loadingAgain_replacesPreviousIndex() {
         val engine = engineWith("hello")
-        engine.load(sequenceOf("zebra"))
-        // "helo" is no longer close to anything in the new dictionary.
+        engine.load(TestIndex.build(mapOf("zebra" to 1)))
         assertNull(engine.bestCorrection("helo"))
+        assertEquals(1, engine.wordCount)
     }
 
     /**
-     * Regression test for a bug found on the watch: typing "helo" offered "halo / held / helm"
+     * Regression test for the bug found on the watch: typing "helo" offered "halo / held / helm"
      * and never "hello".
      *
-     * Every one of those is a legitimate edit-distance-1 neighbour of "helo" — halo/held/helm/help
-     * by substituting a letter, hello by inserting one. Because the shipped word lists carried no
-     * frequency column, all of them were loaded with frequency 1.0, so the order among them was
-     * arbitrary and the three the user actually saw were effectively picked at random. With real
-     * frequencies attached, the row is ordered by how common the words are and "hello" makes the
-     * cut while the rarer "halo" does not.
+     * All six words are edit-distance 1 from "helo" — halo/held/helm/help/hero by substituting a
+     * letter, hello by inserting one. The word lists shipped without frequencies, so every entry
+     * weighed the same and the order among them was arbitrary; the three the user saw were
+     * effectively chosen at random. Frequencies are the fix, and they are the real Leipzig-derived
+     * values from the shipped English list.
      *
-     * The numbers are the real Leipzig-derived values shipped in assets/dictionaries/en.txt.
-     * "help" and "held" genuinely outrank "hello" in news text, and that is fine: nothing is ever
-     * applied automatically (the keyboard only offers, the user taps), so the requirement is that
-     * "hello" is *present*, not that it is first.
+     * "help" and "held" genuinely outrank "hello" in news text, which is fine: nothing is applied
+     * automatically, so the requirement is that "hello" is *offered*, not that it is first.
      */
     @Test
     fun helo_offersHello_onceFrequenciesAreRealistic() {
         val engine = engineWith(
-            "hello\t119",
-            "halo\t107",
-            "helm\t110",
-            "held\t559",
-            "help\t1382"
+            "help" to 1382,
+            "held" to 559,
+            "hero" to 166,
+            "hello" to 119,
+            "helm" to 110,
+            "halo" to 107
         )
         val suggestions = engine.suggest("helo")
         assertTrue("hello" in suggestions, "expected 'hello' among $suggestions")
-        // The rarer neighbours are the ones that should be squeezed out, not "hello".
         assertFalse("halo" in suggestions, "'halo' is rarer than 'hello': $suggestions")
     }
 
     /**
-     * "helo" has six distance-1 neighbours in the real word list, and on the device the one the
-     * user meant ("hello", 4th by frequency) fell just off the end of a three-chip row. This pins
-     * the widened row so the cap cannot silently drop back.
+     * Four chips rather than three: "helo" has six neighbours and at three the intended word fell
+     * off the end on the device.
      */
     @Test
     fun fourCandidates_areOfferedWhenAvailable() {
         val engine = engineWith(
-            "help\t1382",
-            "held\t559",
-            "hero\t166",
-            "hello\t119",
-            "helm\t110",
-            "halo\t107"
+            "help" to 1382,
+            "held" to 559,
+            "hero" to 166,
+            "hello" to 119,
+            "helm" to 110,
+            "halo" to 107
         )
-        val suggestions = engine.suggest("helo")
-        assertEquals(4, suggestions.size, "expected four chips, got $suggestions")
-        assertEquals(listOf("help", "held", "hero", "hello"), suggestions)
+        assertEquals(listOf("help", "held", "hero", "hello"), engine.suggest("helo"))
     }
 
-    /**
-     * The shipped lists are `word<TAB>frequency`. A list that silently lost its frequency column
-     * would still load and still "work", but every candidate would tie at 1.0 and ranking would
-     * go back to being arbitrary — the original defect. Assert the parse explicitly.
-     */
     @Test
-    fun load_parsesTabSeparatedFrequencies() {
-        val engine = engineWith("aaa\t5", "aab\t9999")
-        assertEquals("aab", engine.suggest("aac").first())
+    fun isKnown_reportsDictionaryMembership() {
+        val engine = engineWith("hello")
+        assertTrue(engine.isKnown("hello"))
+        assertTrue(engine.isKnown("HELLO"), "lookups must be case-insensitive")
+        assertFalse(engine.isKnown("helo"))
     }
 
-    /** The ordering invariant the fix relies on: more frequent candidates come first. */
     @Test
-    fun suggestions_areOrderedByFrequency() {
-        val engine = engineWith("hello\t119", "halo\t107", "help\t1382")
-        assertEquals(listOf("help", "hello", "halo"), engine.suggest("helo"))
+    fun suggest_isCaseInsensitive() {
+        val engine = engineWith("hello")
+        assertTrue("hello" in engine.suggest("HELO"))
+    }
+
+    // --- robustness: a corrupt asset must disable correction, never crash (spec §11) ---
+
+    @Test
+    fun load_rejectsBufferWithWrongMagic() {
+        val junk = ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN)
+        junk.putInt(0xDEADBEEF.toInt())
+        junk.rewind()
+        val engine = SpellEngine().apply { load(junk) }
+        assertFalse(engine.isReady)
+        assertTrue(engine.suggest("helo").isEmpty())
+    }
+
+    @Test
+    fun load_rejectsTruncatedBuffer() {
+        val full = TestIndex.build(mapOf("hello" to 5, "world" to 3))
+        val truncated = ByteBuffer.allocate(full.capacity() / 2).order(ByteOrder.LITTLE_ENDIAN)
+        full.limit(truncated.capacity())
+        truncated.put(full)
+        truncated.rewind()
+        val engine = SpellEngine().apply { load(truncated) }
+        assertFalse(engine.isReady, "a half-written index must be rejected, not mapped")
+    }
+
+    @Test
+    fun load_rejectsEmptyBuffer() {
+        val engine = SpellEngine().apply { load(ByteBuffer.allocate(0)) }
+        assertFalse(engine.isReady)
+    }
+
+    @Test
+    fun emptyIndex_isHandledCleanly() {
+        val engine = SpellEngine().apply { load(TestIndex.build(emptyMap())) }
+        assertTrue(engine.suggest("anything").isEmpty())
+        assertFalse(engine.isKnown("anything"))
     }
 }

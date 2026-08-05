@@ -1,6 +1,15 @@
-// Spec §7.2: SymSpellKt (MIT, pure Kotlin Multiplatform — no JNI, no native binary, therefore
-// no ABI risk on this 32-bit-only watch). maxEditDistance is fixed at 1 per §4.2: distance 2
-// costs 15-16 MB per language and is rejected outright.
+// Autocorrect engine (spec §7.2, §4.2).
+//
+// No third-party dependency. SymSpellKt (MIT) was used first and is a perfectly good library, but
+// its in-memory form is Map<Long, ArrayList<String>> for the delete table plus Map<String, Double>
+// for frequencies — three Java objects per delete variant, and a 10 000-word list generates 68 625
+// variants. Measured on the watch (dumpsys meminfo, Dalvik Heap → Alloc) one resident dictionary
+// cost 15.5 MB against the spec's 8 MB gate, having already come down from 39.8 MB when the list
+// was cut from 30 000 words. The overhead is structural, so §4.2's pre-authorised fallback applies:
+// a flat index read through a genuine mmap path. That is WordIndex, which needs nothing but the
+// standard library.
+//
+// Dropping the dependency also removes the last non-Apache/BSD component from the APK.
 plugins {
     kotlin("jvm")
 }
@@ -16,9 +25,6 @@ kotlin {
 
 dependencies {
     implementation(project(":ime-core"))
-    // Note the capitalisation: the published Maven Central coordinate is "SymSpellKt", and the
-    // JVM variant is resolved automatically from the Kotlin Multiplatform metadata.
-    api("com.darkrockstudios:symspellkt:3.4.0")
     testImplementation(kotlin("test"))
 }
 

@@ -35,13 +35,35 @@ The single most expensive decision in the project. Numbers below are `dumpsys me
 | State | Dalvik heap allocated |
 |---|---|
 | No dictionary resident | 2.3 MB |
-| One resident dictionary, 30 000 words | **39.8 MB** |
-| One resident dictionary, 10 000 words | see `CHANGELOG` for the current measurement |
+| SymSpellKt, 30 000 words | **39.8 MB** |
+| SymSpellKt, 10 000 words | **15.5 MB** |
+| Packed mapped index, 10 000 words | file-backed pages, ~0 heap |
 
 The spec's gate (§14) is **under 8 MB**, and its §4.2 budget assumed 10 000 words per language at
-roughly 3.7 MB. An earlier revision shipped 30 000 words without reconciling that against the
-budget, and blew the gate by nearly five times: SymSpell's delete-variant table grows worse than
-linearly, so tripling the word count cost roughly ten times the heap.
+roughly 3.7 MB. Two separate problems were found, in this order.
+
+**Too many words.** An earlier revision shipped 30 000 without reconciling that against the budget.
+Cutting to the specified 10 000 took 39.8 MB down to 15.5 MB.
+
+**The library's representation.** 15.5 MB still misses the gate by nearly double, and the cause is
+structural rather than tunable. `javap` on `SymSpellKt-jvm-3.4.0` shows the delete table is
+`Map<Long, ArrayList<String>>` and frequencies are `Map<String, Double>` — a `HashMap.Node`, a boxed
+`Long` and an `ArrayList` for every delete variant, of which 10 000 English words generate 68 625.
+The spec anticipated this precisely and set the rule in advance: *"Benchmark SymSpellKt's actual
+retained heap on-device first. If it fits the budget, use it as-is and drop the mmap claim. If it
+does not, write a small flat-trie reader with a genuine mmap path. Pick one."*
+
+So `dict/WordIndex.kt` replaces it: one binary file of primitive tables, built by
+`tools/build_index.py`, memory-mapped read-only at runtime. There are no per-entry objects, the
+pages are clean and file-backed so the kernel can evict them, and words are stored in descending
+frequency order so candidates come out pre-ranked without sorting per keystroke. The `.bin` assets
+must be **stored, not deflated** — a compressed asset cannot be mapped — which is why
+`noCompress.add("bin")` is in `app/build.gradle.kts` and why CI asserts it.
+
+The one risk this introduces is that the Python writer and the Kotlin reader each implement FNV-1a
+independently. If they ever disagree, the app still starts, still maps its asset, and silently finds
+nothing. `WordIndexTest.hash64_matchesReferenceValues` pins known values on the Kotlin side, and CI
+recompiles the indexes and byte-compares them against the committed ones.
 
 Two measurement traps cost real time here, recorded so they are not repeated:
 
