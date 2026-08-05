@@ -169,6 +169,62 @@ class KeyGridView @JvmOverloads constructor(
     /** Amplitude-only haptics per spec §8.1. Exposed so settings can adjust intensity later. */
     val haptics = HapticFeedback(context)
 
+    // --- Press animation (spec §8.0: spring physics, not linear tweens) ---
+    //
+    // A single spring drives the pressed key's scale. Only one key can be pressed at a time on
+    // this hardware, so one animation object is enough — and reusing it means zero allocation
+    // in the touch hot path.
+    //
+    // `pressScale` is what onDraw reads: 1.0 = at rest, ~0.88 = fully pressed. The spring
+    // settles rather than snapping, which is what makes it read as physical rather than
+    // mechanical.
+    private var pressScale = 1f
+
+    private val pressScaleProperty =
+        object : androidx.dynamicanimation.animation.FloatPropertyCompat<KeyGridView>("pressScale") {
+            override fun getValue(view: KeyGridView): Float = view.pressScale * 100f
+            override fun setValue(view: KeyGridView, value: Float) {
+                view.pressScale = value / 100f
+                view.invalidate()
+            }
+        }
+
+    private val pressSpring by lazy {
+        androidx.dynamicanimation.animation.SpringAnimation(this, pressScaleProperty).apply {
+            spring = androidx.dynamicanimation.animation.SpringForce().apply {
+                // Low damping ratio gives a slight overshoot on release — the "bounce back"
+                // that makes a key feel like it has mass. Stiffness is high so the whole
+                // gesture still resolves well inside the spec's 80 ms responsiveness budget.
+                dampingRatio = androidx.dynamicanimation.animation.SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+                stiffness = androidx.dynamicanimation.animation.SpringForce.STIFFNESS_HIGH
+            }
+            setStartValue(100f)
+        }
+    }
+
+    /**
+     * Honours the system's animator duration scale (spec §8.0 reduced-motion requirement).
+     * When the user has turned animations off, scale 0 means we skip the spring entirely and
+     * jump straight to the target.
+     */
+    private val animationsEnabled: Boolean
+        get() = runCatching {
+            android.provider.Settings.Global.getFloat(
+                context.contentResolver,
+                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f
+            ) > 0f
+        }.getOrDefault(true)
+
+    private fun animatePressTo(target: Float) {
+        if (!animationsEnabled) {
+            pressScale = target
+            invalidate()
+            return
+        }
+        pressSpring.animateToFinalPosition(target * 100f)
+    }
+
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#1C1C1E")
         style = Paint.Style.FILL
@@ -439,6 +495,15 @@ class KeyGridView @JvmOverloads constructor(
                 else -> keyPaint
             }
             val radius = minOf(key.rect.width(), key.rect.height()) * 0.28f
+
+            // The pressed key is drawn scaled about its own centre, driven by the spring.
+            // Everything else draws normally — no per-frame work for untouched keys.
+            val scaled = key === pressedKey && pressScale != 1f
+            if (scaled) {
+                canvas.save()
+                canvas.scale(pressScale, pressScale, key.rect.centerX(), key.rect.centerY())
+            }
+
             canvas.drawRoundRect(key.rect, radius, radius, paint)
             canvas.drawRoundRect(key.rect, radius, radius, keyBorderPaint)
 
@@ -469,6 +534,8 @@ class KeyGridView @JvmOverloads constructor(
             )
             labelPaint.textSize = baseSize
             labelPaint.color = Color.WHITE
+
+            if (scaled) canvas.restore()
         }
     }
 
@@ -476,6 +543,7 @@ class KeyGridView @JvmOverloads constructor(
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 pressedKey = keyAt(event.x, event.y)
+                if (pressedKey != null) animatePressTo(PRESSED_SCALE)
                 invalidate()
                 return pressedKey != null
             }
@@ -483,6 +551,7 @@ class KeyGridView @JvmOverloads constructor(
                 val current = keyAt(event.x, event.y)
                 if (current !== pressedKey) {
                     pressedKey = current
+                    animatePressTo(if (current != null) PRESSED_SCALE else 1f)
                     invalidate()
                 }
                 return true
@@ -490,6 +559,8 @@ class KeyGridView @JvmOverloads constructor(
             MotionEvent.ACTION_UP -> {
                 val released = pressedKey
                 pressedKey = null
+                // Spring back with the bounce — this is the part that reads as physical.
+                animatePressTo(1f)
                 invalidate()
                 if (released != null) {
                     announceForKey(released)
@@ -535,6 +606,7 @@ class KeyGridView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_CANCEL -> {
                 pressedKey = null
+                animatePressTo(1f)
                 invalidate()
                 return true
             }
@@ -615,6 +687,12 @@ class KeyGridView @JvmOverloads constructor(
     }
 
     companion object {
+        /**
+         * How far a key shrinks while held. Subtle on purpose — at watch size a large scale
+         * change reads as the key wobbling rather than depressing.
+         */
+        private const val PRESSED_SCALE = 0.88f
+
         /** Gap drawn between adjacent keys. Small — touch slop is handled in [keyAt] instead. */
         private const val KEY_GAP_PX = 3f
         /**
