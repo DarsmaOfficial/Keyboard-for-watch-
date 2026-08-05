@@ -35,8 +35,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run ime-core unit tests
-        run: ./gradlew :ime-core:test --stacktrace --no-daemon
+      - name: Run unit tests
+        run: ./gradlew :ime-core:test :dict:test --stacktrace --no-daemon
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
