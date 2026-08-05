@@ -52,10 +52,22 @@ class SuggestionStripView @JvmOverloads constructor(
     }
 
     /** Replaces the offered candidates. Passing an empty list hides the strip entirely. */
+    /**
+     * Replaces the offered candidates.
+     *
+     * The row uses INVISIBLE rather than GONE when empty, and this is deliberate. Collapsing it
+     * re-lays-out the key grid *while the user is mid-word*: found on-device, typing "helo" put
+     * the third tap on a candidate chip because the strip had appeared after "hel" and pushed
+     * every key down by its own height. A keyboard whose keys move under your finger is worse
+     * than one that spends 26 dp on an occasionally-empty row, so the space is reserved
+     * permanently and key geometry never changes while a field is focused.
+     */
     fun setSuggestions(words: List<String>) {
         if (suggestions == words) return
         suggestions = words
-        visibility = if (words.isEmpty()) GONE else VISIBLE
+        // Reserve the height either way; only the painting is suppressed when there is nothing
+        // to offer. INVISIBLE still occupies its measured space, GONE does not.
+        visibility = if (words.isEmpty()) INVISIBLE else VISIBLE
         computeSlots()
         invalidate()
     }

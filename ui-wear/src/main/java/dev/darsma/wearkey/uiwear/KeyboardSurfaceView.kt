@@ -49,11 +49,12 @@ class KeyboardSurfaceView @JvmOverloads constructor(
         }
         addView(compositionStrip)
 
-        // Candidate row: only occupies space when it actually has suggestions to show, so an
-        // empty autocorrect row never steals height from the keys.
+        // Candidate row: height is reserved permanently (INVISIBLE when empty, never GONE).
+        // Letting it collapse re-flows the key grid mid-word and moves keys under the user's
+        // finger — reproduced on-device, see SuggestionStripView.setSuggestions.
         suggestionStrip = SuggestionStripView(context).apply {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, (26f * density).toInt())
-            visibility = GONE
+            visibility = INVISIBLE
         }
         addView(suggestionStrip)
 
