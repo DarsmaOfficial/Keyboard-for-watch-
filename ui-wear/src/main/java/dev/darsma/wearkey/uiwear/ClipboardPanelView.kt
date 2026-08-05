@@ -56,6 +56,10 @@ class ClipboardPanelView @JvmOverloads constructor(
         color = Color.parseColor("#8E8E93")
         textAlign = Paint.Align.CENTER
     }
+    private val backPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#00E5FF")
+        textAlign = Paint.Align.CENTER
+    }
     private val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#00E5FF") }
     private val pinOffPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#5A5A5E") }
     private val deletePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -67,7 +71,12 @@ class ClipboardPanelView @JvmOverloads constructor(
         textAlign = Paint.Align.LEFT
     }
 
-    private data class Row(val entry: ClipboardStore.Entry?, val rect: RectF, val isClearAll: Boolean = false)
+    private data class Row(
+        val entry: ClipboardStore.Entry?,
+        val rect: RectF,
+        val isClearAll: Boolean = false,
+        val isClose: Boolean = false
+    )
 
     private val rows = mutableListOf<Row>()
     private var pressedRow: Row? = null
@@ -81,6 +90,7 @@ class ClipboardPanelView @JvmOverloads constructor(
         hintPaint.textSize = 13f * density
         deletePaint.textSize = 16f * density
         sensitivePaint.textSize = 11f * density
+        backPaint.textSize = 14f * density
     }
 
     fun bind(store: ClipboardStore) {
@@ -122,7 +132,11 @@ class ClipboardPanelView @JvmOverloads constructor(
         val centerX = radius - loc[0].toFloat()
 
         var y = 4f * density - scrollY
-        val items = entries.size + 1 // + "clear all"
+        // Row order: [back to keyboard] [entries...] [clear all]
+        // The back row comes first and is pinned at the top of the list so it is always the
+        // first thing reachable — without it, opening the panel would be a one-way trip,
+        // since the clipboard key itself is part of the key grid this panel replaces.
+        val items = entries.size + 2
 
         for (i in 0 until items) {
             val top = y
@@ -133,10 +147,10 @@ class ClipboardPanelView @JvmOverloads constructor(
             val r = (centerX + half).coerceAtMost(width.toFloat()) - 8f
             if (r > l) {
                 val rect = RectF(l, top, r, bottom)
-                if (i < entries.size) {
-                    rows.add(Row(entries[i], rect))
-                } else {
-                    rows.add(Row(null, rect, isClearAll = true))
+                when (i) {
+                    0 -> rows.add(Row(null, rect, isClose = true))
+                    items - 1 -> rows.add(Row(null, rect, isClearAll = true))
+                    else -> rows.add(Row(entries[i - 1], rect))
                 }
             }
             y = bottom + gap
@@ -152,10 +166,12 @@ class ClipboardPanelView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
         if (entries.isEmpty()) {
+            // Sits between the "back" row at the top and the "clear all" row, so it never
+            // overlaps either.
             canvas.drawText(
                 context.getString(R.string.clipboard_empty),
                 width / 2f,
-                height / 2f,
+                height * 0.55f,
                 hintPaint
             )
         }
@@ -166,6 +182,16 @@ class ClipboardPanelView @JvmOverloads constructor(
             val paint = if (row === pressedRow) rowPressedPaint else rowPaint
             val radius = 10f * density
             canvas.drawRoundRect(row.rect, radius, radius, paint)
+
+            if (row.isClose) {
+                canvas.drawText(
+                    context.getString(R.string.clipboard_back),
+                    row.rect.centerX(),
+                    row.rect.centerY() - (backPaint.ascent() + backPaint.descent()) / 2,
+                    backPaint
+                )
+                continue
+            }
 
             if (row.isClearAll) {
                 canvas.drawText(
@@ -249,6 +275,10 @@ class ClipboardPanelView @JvmOverloads constructor(
                 invalidate()
                 if (dragging || row == null) return true
 
+                if (row.isClose) {
+                    listener?.onClose()
+                    return true
+                }
                 if (row.isClearAll) {
                     listener?.onClearAll()
                     return true

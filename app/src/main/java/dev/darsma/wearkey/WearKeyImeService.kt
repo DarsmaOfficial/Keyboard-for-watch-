@@ -155,6 +155,20 @@ class WearKeyImeService : InputMethodService() {
         }
     }
 
+    /**
+     * While the clipboard panel is open, the hardware/system back gesture closes the panel
+     * instead of dismissing the whole keyboard — a second back then dismisses as usual. Without
+     * this, opening the panel and pressing back would hide the keyboard entirely, which is not
+     * what the user means.
+     */
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && surfaceView?.isClipboardOpen == true) {
+            surfaceView?.hideClipboard()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     private fun handleKey(action: KeyGridView.KeyAction) {
         val ic = currentInputConnection ?: return
         ic.beginBatchEdit()

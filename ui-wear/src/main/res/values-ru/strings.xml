@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="clipboard_back">‹ К клавиатуре</string>
     <string name="clipboard_empty">Буфер обмена пуст</string>
     <string name="clipboard_clear_all">Очистить всё</string>
     <string name="clipboard_expires">скоро исчезнет</string>

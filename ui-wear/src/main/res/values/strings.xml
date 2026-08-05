@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="clipboard_back">‹ Back to keyboard</string>
     <string name="clipboard_empty">Clipboard is empty</string>
     <string name="clipboard_clear_all">Clear all</string>
     <string name="clipboard_expires">expires soon</string>
