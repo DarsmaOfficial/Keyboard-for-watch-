@@ -181,7 +181,13 @@ class WearKeyImeService : InputMethodService() {
                     )
                 }
                 KeyGridView.KeyAction.SwitchLanguage -> switchLanguage()
-                KeyGridView.KeyAction.Clipboard -> surfaceView?.toggleClipboard()
+                KeyGridView.KeyAction.Clipboard -> {
+                    // Re-read the system clipboard on every open, not just when the field is
+                    // first focused: the user may have copied something without the keyboard
+                    // being dismissed in between. Still legal — we hold focus right now.
+                    captureSystemClipboard(currentInputEditorInfo)
+                    surfaceView?.toggleClipboard()
+                }
             }
         } finally {
             ic.endBatchEdit()
