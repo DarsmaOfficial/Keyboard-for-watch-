@@ -301,7 +301,11 @@ class KeyGridView @JvmOverloads constructor(
         val radius = minOf(screenW, screenH) / 2f
         // Circle centre expressed in this view's own coordinate space.
         val circleCenterYInView = radius - viewTopOnScreen
-        val circleCenterX = radius - viewLeftOnScreen
+        // Horizontally the keyboard window spans the full display width, so the circle's centre
+        // is simply the middle of this view. Deriving it as `radius - viewLeft` was wrong
+        // whenever the display is not exactly square: it pushed the whole grid sideways, leaving
+        // a dead strip on one edge and shoving the opposite column under the bezel.
+        val circleCenterX = width / 2f
 
         for ((rowIndex, row) in letterRows.withIndex()) {
             val top = gridTop + rowIndex * rowHeight

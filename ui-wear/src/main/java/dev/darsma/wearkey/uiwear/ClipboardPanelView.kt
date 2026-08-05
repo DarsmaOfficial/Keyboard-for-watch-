@@ -129,7 +129,9 @@ class ClipboardPanelView @JvmOverloads constructor(
         val screenH = resources.displayMetrics.heightPixels.toFloat()
         val radius = minOf(screenW, screenH) / 2f
         val centerYInView = radius - loc[1].toFloat()
-        val centerX = radius - loc[0].toFloat()
+        // Same fix as KeyGridView: the panel spans the full display width, so the circle centre
+        // is the middle of this view, not `radius - viewLeft`.
+        val centerX = width / 2f
 
         var y = 4f * density - scrollY
         // Row order: [back to keyboard] [entries...] [clear all]
