@@ -30,6 +30,7 @@ class KeyboardSurfaceView @JvmOverloads constructor(
 
     val compositionStrip: CompositionStripView
     val keyGrid: KeyGridView
+    val clipboardPanel: ClipboardPanelView
 
     init {
         setBackgroundColor(Color.BLACK)
@@ -51,6 +52,14 @@ class KeyboardSurfaceView @JvmOverloads constructor(
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
         }
         addView(keyGrid)
+
+        // Occupies the same slot as the key grid — on a 233dp round display there is no room to
+        // show both at once, so the clipboard panel replaces the keys while it is open.
+        clipboardPanel = ClipboardPanelView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
+            visibility = GONE
+        }
+        addView(clipboardPanel)
     }
 
     /** Wires both sub-views to the given state in one call — keeps entry points' code trivial. */
@@ -64,6 +73,25 @@ class KeyboardSurfaceView @JvmOverloads constructor(
     fun unbind() {
         compositionStrip.unbind()
         compositionStrip.onCaretRequestListener = null
+    }
+
+    /** True while the clipboard history panel is showing instead of the key grid. */
+    val isClipboardOpen: Boolean
+        get() = clipboardPanel.visibility == VISIBLE
+
+    fun showClipboard() {
+        clipboardPanel.refresh()
+        keyGrid.visibility = GONE
+        clipboardPanel.visibility = VISIBLE
+    }
+
+    fun hideClipboard() {
+        clipboardPanel.visibility = GONE
+        keyGrid.visibility = VISIBLE
+    }
+
+    fun toggleClipboard() {
+        if (isClipboardOpen) hideClipboard() else showClipboard()
     }
 
     /**

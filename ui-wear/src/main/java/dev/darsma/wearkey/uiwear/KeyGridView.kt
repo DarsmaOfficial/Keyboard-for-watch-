@@ -35,6 +35,8 @@ class KeyGridView @JvmOverloads constructor(
         object Backspace : KeyAction()
         object Enter : KeyAction()
         object SwitchLanguage : KeyAction()
+        /** Opens the clipboard history panel (spec §6). */
+        object Clipboard : KeyAction()
     }
 
     fun interface OnKeyListener {
@@ -245,10 +247,11 @@ class KeyGridView @JvmOverloads constructor(
         val funcRight = (circleCenterX + funcHalfChord).coerceAtMost(width.toFloat()) - KEY_EDGE_INSET_PX
         val funcWidth = (funcRight - funcLeft).coerceAtLeast(1f)
 
-        val backspaceWidth = funcWidth * 0.22f
-        val switchLangWidth = funcWidth * 0.18f
-        val enterWidth = funcWidth * 0.22f
-        val spaceWidth = funcWidth - backspaceWidth - switchLangWidth - enterWidth
+        val backspaceWidth = funcWidth * 0.19f
+        val switchLangWidth = funcWidth * 0.16f
+        val clipboardWidth = funcWidth * 0.16f
+        val enterWidth = funcWidth * 0.19f
+        val spaceWidth = funcWidth - backspaceWidth - switchLangWidth - clipboardWidth - enterWidth
 
         var x = funcLeft
         keys.add(
@@ -261,6 +264,11 @@ class KeyGridView @JvmOverloads constructor(
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + switchLangWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
         x += switchLangWidth
+        keys.add(
+            Key(KeyAction.Clipboard, "▤",
+                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + clipboardWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
+        )
+        x += clipboardWidth
         keys.add(
             Key(KeyAction.Space, "␣",
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + spaceWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))

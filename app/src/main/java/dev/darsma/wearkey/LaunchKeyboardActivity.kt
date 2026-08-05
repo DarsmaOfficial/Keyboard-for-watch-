@@ -4,7 +4,9 @@ import android.app.Activity
 import android.app.RemoteInput
 import android.content.Intent
 import android.os.Bundle
+import dev.darsma.wearkey.imecore.ClipboardStore
 import dev.darsma.wearkey.imecore.EditorState
+import dev.darsma.wearkey.uiwear.ClipboardPanelView
 import dev.darsma.wearkey.uiwear.KeyGridView
 import dev.darsma.wearkey.uiwear.KeyboardSurfaceView
 
@@ -23,6 +25,7 @@ class LaunchKeyboardActivity : Activity() {
 
     private var surfaceView: KeyboardSurfaceView? = null
     private val editorState = EditorState()
+    private val clipboardStore = ClipboardStore()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,8 +33,41 @@ class LaunchKeyboardActivity : Activity() {
         val view = KeyboardSurfaceView(this)
         view.bind(editorState)
         view.keyGrid.onKeyListener = KeyGridView.OnKeyListener { action -> handleKey(action) }
+        view.clipboardPanel.bind(clipboardStore)
+        view.clipboardPanel.listener = object : ClipboardPanelView.Listener {
+            override fun onPaste(text: String) {
+                editorState.commitText(text)
+                view.hideClipboard()
+            }
+
+            override fun onPin(text: String, pinned: Boolean) {
+                clipboardStore.pin(text, pinned)
+                view.clipboardPanel.refresh()
+            }
+
+            override fun onDelete(text: String) {
+                clipboardStore.delete(text)
+                view.clipboardPanel.refresh()
+            }
+
+            override fun onClearAll() {
+                clipboardStore.clearAll()
+                view.clipboardPanel.refresh()
+            }
+
+            override fun onClose() {
+                view.hideClipboard()
+            }
+        }
         surfaceView = view
         setContentView(view)
+
+        // Same rule as the IME path: clipboard is read only while we're in the foreground.
+        getSystemService(android.content.ClipboardManager::class.java)?.primaryClip?.let { clip ->
+            if (clip.itemCount > 0) {
+                clip.getItemAt(0).coerceToText(this)?.toString()?.let { clipboardStore.add(it) }
+            }
+        }
 
         // Pre-fill from any existing RemoteInput results the caller supplied, if present —
         // mirrors how WearKeyImeService primes EditorState from the field's existing text.
@@ -60,6 +96,7 @@ class LaunchKeyboardActivity : Activity() {
             KeyGridView.KeyAction.Space -> editorState.commitText(" ")
             KeyGridView.KeyAction.Backspace -> editorState.backspace()
             KeyGridView.KeyAction.Enter -> commitAndFinish()
+            KeyGridView.KeyAction.Clipboard -> surfaceView?.toggleClipboard()
             KeyGridView.KeyAction.SwitchLanguage -> {
                 // Activity (not an InputMethodService) has no switchToNextInputMethod() /
                 // InputMethodSubtype API — this is a plain Activity per spec §4.5, so the

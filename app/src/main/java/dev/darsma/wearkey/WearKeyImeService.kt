@@ -5,7 +5,9 @@ import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodSubtype
+import dev.darsma.wearkey.imecore.ClipboardStore
 import dev.darsma.wearkey.imecore.EditorState
+import dev.darsma.wearkey.uiwear.ClipboardPanelView
 import dev.darsma.wearkey.uiwear.KeyGridView
 import dev.darsma.wearkey.uiwear.KeyboardSurfaceView
 
@@ -24,13 +26,70 @@ class WearKeyImeService : InputMethodService() {
 
     private var surfaceView: KeyboardSurfaceView? = null
     private val editorState = EditorState()
+    private val clipboardStore = ClipboardStore()
 
     override fun onCreateInputView(): View {
         val view = KeyboardSurfaceView(this)
         view.bind(editorState)
         view.keyGrid.onKeyListener = KeyGridView.OnKeyListener { action -> handleKey(action) }
+        view.clipboardPanel.bind(clipboardStore)
+        view.clipboardPanel.listener = object : ClipboardPanelView.Listener {
+            override fun onPaste(text: String) {
+                pasteText(text)
+                view.hideClipboard()
+            }
+
+            override fun onPin(text: String, pinned: Boolean) {
+                clipboardStore.pin(text, pinned)
+                view.clipboardPanel.refresh()
+            }
+
+            override fun onDelete(text: String) {
+                clipboardStore.delete(text)
+                view.clipboardPanel.refresh()
+            }
+
+            override fun onClearAll() {
+                clipboardStore.clearAll()
+                view.clipboardPanel.refresh()
+            }
+
+            override fun onClose() {
+                view.hideClipboard()
+            }
+        }
         surfaceView = view
         return view
+    }
+
+    /**
+     * Pulls whatever is currently on the system clipboard into our local history.
+     *
+     * Android 10+ only permits clipboard reads while the IME actually holds focus (spec §6), so
+     * this is called from onStartInputView — never from a background poll, and never via an
+     * AccessibilityService workaround.
+     */
+    private fun captureSystemClipboard(info: EditorInfo?) {
+        // Never learn from password / OTP / no-personalised-learning fields (spec §11.5).
+        val noLearning = ((info?.imeOptions ?: 0) and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
+        if (noLearning) return
+
+        val cm = getSystemService(android.content.ClipboardManager::class.java) ?: return
+        val clip = cm.primaryClip ?: return
+        if (clip.itemCount <= 0) return
+        val text = clip.getItemAt(0).coerceToText(this)?.toString() ?: return
+        clipboardStore.add(text)
+    }
+
+    private fun pasteText(text: String) {
+        val ic = currentInputConnection ?: return
+        ic.beginBatchEdit()
+        try {
+            editorState.commitText(text)
+            ic.commitText(text, 1)
+        } finally {
+            ic.endBatchEdit()
+        }
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
@@ -51,6 +110,11 @@ class WearKeyImeService : InputMethodService() {
                 editorState.syncSelection(existing.selectionStart, existing.selectionEnd)
             }
         }
+
+        // Clipboard reads are only legal while the IME holds focus (spec §6) — do it here.
+        captureSystemClipboard(info)
+        // Never leave the clipboard panel open across fields.
+        surfaceView?.hideClipboard()
 
         surfaceView?.startFrameTiming()
     }
@@ -117,6 +181,7 @@ class WearKeyImeService : InputMethodService() {
                     )
                 }
                 KeyGridView.KeyAction.SwitchLanguage -> switchLanguage()
+                KeyGridView.KeyAction.Clipboard -> surfaceView?.toggleClipboard()
             }
         } finally {
             ic.endBatchEdit()
