@@ -29,6 +29,7 @@ class KeyboardSurfaceView @JvmOverloads constructor(
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
     val compositionStrip: CompositionStripView
+    val suggestionStrip: SuggestionStripView
     val keyGrid: KeyGridView
     val clipboardPanel: ClipboardPanelView
 
@@ -47,6 +48,14 @@ class KeyboardSurfaceView @JvmOverloads constructor(
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, stripHeightPx)
         }
         addView(compositionStrip)
+
+        // Candidate row: only occupies space when it actually has suggestions to show, so an
+        // empty autocorrect row never steals height from the keys.
+        suggestionStrip = SuggestionStripView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, (26f * density).toInt())
+            visibility = GONE
+        }
+        addView(suggestionStrip)
 
         keyGrid = KeyGridView(context).apply {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }

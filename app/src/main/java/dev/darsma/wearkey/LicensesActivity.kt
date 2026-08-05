@@ -22,7 +22,12 @@ class LicensesActivity : Activity() {
     private val files = listOf(
         "THIRD_PARTY_LICENSES.md" to "Third-party licences",
         "Apache-2.0.txt" to "Apache License 2.0",
-        "NOTICE.txt" to "NOTICE"
+        "NOTICE.txt" to "NOTICE",
+        // The bundled word lists are BSD-licensed, and BSD explicitly requires binary
+        // redistributions to reproduce the notice — so these must be viewable in the app
+        // itself, not merely in the repository (spec §3.2).
+        "dictionary-en-SCOWL-LICENSE.txt" to "English word list (SCOWL)",
+        "dictionary-ru-LICENSE.txt" to "Russian word list (Lebedev)"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {

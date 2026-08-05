@@ -13,13 +13,23 @@ The project's own licence is Apache-2.0 — see [`LICENSE`](LICENSE) and [`NOTIC
 | Component | Version | Licence | Upstream |
 |---|---|---|---|
 | Kotlin standard library (`kotlin-stdlib`) | 2.1.0 | Apache-2.0 | https://github.com/JetBrains/kotlin |
+| `androidx.dynamicanimation` | 1.0.0 | Apache-2.0 | https://developer.android.com/jetpack/androidx |
+| SymSpellKt | 3.4.0 | MIT | https://github.com/Darkrock-Studios/SymSpellKt |
+| English word list (SCOWL, via `wooorm/dictionaries`) | 2020.12.07 | BSD-style | https://github.com/wooorm/dictionaries |
+| Russian word list (Lebedev, via `wooorm/dictionaries`) | 2020 | BSD | https://github.com/wooorm/dictionaries |
 
-Nothing else is bundled. In particular this release contains:
+The word lists are derived from the upstream Hunspell `.dic` files: affix flags stripped, entries
+lowercased and de-duplicated, capped at 30 000 words per language. The exact procedure is in
+[`tools/build_dictionaries.py`](tools/build_dictionaries.py). The Hunspell *engine* is never
+shipped — only the data, which is permissively licensed.
+
+Both word-list licences require the notice to be reproduced in **binary** redistributions, so
+their full texts are bundled into the APK and shown by the in-app licences screen.
+
+In particular this release still contains:
 
 - **no** third-party UI toolkit (the keyboard surface is plain `View` + `Canvas`)
 - **no** bundled fonts — the watch's own system fonts are used, so no OFL obligations arise
-- **no** dictionaries or word lists yet (autocorrect is not implemented; when it is, each
-  language pack must pass a per-language licence audit and be recorded here)
 - **no** native libraries of any kind — verify with `unzip -l app-release.apk | grep lib/`
 
 ---

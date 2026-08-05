@@ -5,11 +5,13 @@ import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodSubtype
+import dev.darsma.wearkey.dict.SpellEngine
 import dev.darsma.wearkey.imecore.ClipboardStore
 import dev.darsma.wearkey.imecore.EditorState
 import dev.darsma.wearkey.uiwear.ClipboardPanelView
 import dev.darsma.wearkey.uiwear.KeyGridView
 import dev.darsma.wearkey.uiwear.KeyboardSurfaceView
+import dev.darsma.wearkey.uiwear.SuggestionStripView
 
 /**
  * Entry point 1 (spec §4.5): the classic InputMethodService path for standard EditText fields.
@@ -29,12 +31,73 @@ class WearKeyImeService : InputMethodService() {
     private val clipboardStore = ClipboardStore()
     private val clipboardPersistence by lazy { EncryptedClipboardPersistence(this) }
 
+    private val spellEngine = SpellEngine()
+    private val dictionaryLoader by lazy { DictionaryLoader(this, spellEngine) }
+
+    /**
+     * True while the current field forbids learning or is masked. Autocorrect stays completely
+     * silent in those fields — no suggestions, no dictionary lookups (spec §11.5 security).
+     */
+    private var suggestionsDisabled = false
+
     override fun onCreate() {
         super.onCreate()
         // Restore encrypted history once, up front (spec §6: history survives process death).
         clipboardPersistence.load(clipboardStore)
         // Persist on every change so a kill by memory pressure never loses entries.
         clipboardStore.addListener(ClipboardStore.Listener { clipboardPersistence.save(clipboardStore) })
+        // Word list loads on a background thread; until it lands, autocorrect is simply absent.
+        dictionaryLoader.loadFor(KeyGridView.Layout.EN_US)
+    }
+
+    override fun onDestroy() {
+        dictionaryLoader.shutdown()
+        super.onDestroy()
+    }
+
+    /**
+     * The word currently being typed — everything back to the last space or start of text.
+     * Suggestions are computed from this rather than from the whole field.
+     */
+    private fun currentWord(): String {
+        val text = editorState.text
+        val caret = editorState.selectionStart.coerceIn(0, text.length)
+        val start = text.lastIndexOfAny(WORD_SEPARATORS, caret - 1) + 1
+        return text.substring(start, caret)
+    }
+
+    /** Refreshes the candidate row for whatever word is being typed right now. */
+    private fun refreshSuggestions() {
+        val strip = surfaceView?.suggestionStrip ?: return
+        if (suggestionsDisabled || !spellEngine.isReady) {
+            strip.clear()
+            return
+        }
+        val word = currentWord()
+        // Nothing worth suggesting for a single letter — everything is one edit away from it.
+        if (word.length < MIN_WORD_FOR_SUGGESTIONS) {
+            strip.clear()
+            return
+        }
+        strip.setSuggestions(spellEngine.suggest(word))
+    }
+
+    /** Replaces the word being typed with [word]. Used by both tap-to-accept and space-commit. */
+    private fun replaceCurrentWord(word: String) {
+        val ic = currentInputConnection ?: return
+        val typed = currentWord()
+        if (typed.isEmpty()) return
+
+        ic.beginBatchEdit()
+        try {
+            repeat(typed.length) { editorState.backspace() }
+            ic.deleteSurroundingText(typed.length, 0)
+            editorState.commitText(word)
+            ic.commitText(word, 1)
+        } finally {
+            ic.endBatchEdit()
+        }
+        surfaceView?.suggestionStrip?.clear()
     }
 
     override fun onCreateInputView(): View {
@@ -67,6 +130,8 @@ class WearKeyImeService : InputMethodService() {
                 view.hideClipboard()
             }
         }
+        view.suggestionStrip.onSuggestionListener =
+            SuggestionStripView.OnSuggestionListener { word -> replaceCurrentWord(word) }
         surfaceView = view
         return view
     }
@@ -127,6 +192,12 @@ class WearKeyImeService : InputMethodService() {
         // Spec §11.5: "a keyboard that shows QWERTY for a phone-number field is broken."
         applyInputTypeAwareness(info)
 
+        // Spec §11.5: never learn from, or suggest into, password / OTP / no-personalised-
+        // learning fields. Autocorrect goes completely silent there.
+        val noLearning = ((info?.imeOptions ?: 0) and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
+        suggestionsDisabled = masked || noLearning
+        surfaceView?.suggestionStrip?.clear()
+
         // Clipboard reads are only legal while the IME holds focus (spec §6) — do it here.
         captureSystemClipboard(info)
         // Never leave the clipboard panel open across fields.
@@ -147,10 +218,14 @@ class WearKeyImeService : InputMethodService() {
      */
     override fun onCurrentInputMethodSubtypeChanged(subtype: InputMethodSubtype?) {
         super.onCurrentInputMethodSubtypeChanged(subtype)
-        surfaceView?.keyGrid?.layout = when (subtype?.languageTag) {
+        val layout = when (subtype?.languageTag) {
             "ru-RU" -> KeyGridView.Layout.RU_RU
             else -> KeyGridView.Layout.EN_US
         }
+        surfaceView?.keyGrid?.layout = layout
+        // Swap the resident dictionary to match — only one language stays loaded (spec §4.2).
+        dictionaryLoader.loadFor(layout)
+        surfaceView?.suggestionStrip?.clear()
     }
 
     override fun onFinishInput() {
@@ -193,14 +268,21 @@ class WearKeyImeService : InputMethodService() {
                 is KeyGridView.KeyAction.Character -> {
                     editorState.commitText(action.char.toString())
                     ic.commitText(action.char.toString(), 1)
+                    refreshSuggestions()
                 }
                 KeyGridView.KeyAction.Space -> {
+                    // Space ends the word: clear the candidate row rather than leaving stale
+                    // suggestions for a word that is already finished. The correction is NOT
+                    // applied automatically — on a watch, silently rewriting what someone typed
+                    // is expensive to undo, so acceptance stays an explicit tap (spec §7.2).
                     editorState.commitText(" ")
                     ic.commitText(" ", 1)
+                    surfaceView?.suggestionStrip?.clear()
                 }
                 KeyGridView.KeyAction.Backspace -> {
                     editorState.backspace()
                     ic.deleteSurroundingText(1, 0)
+                    refreshSuggestions()
                 }
                 KeyGridView.KeyAction.Enter -> {
                     // If the field asked for a specific action (Search / Send / Go / Next /
@@ -307,5 +389,16 @@ class WearKeyImeService : InputMethodService() {
             InputType.TYPE_CLASS_NUMBER -> variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
             else -> false
         }
+    }
+
+    companion object {
+        /** Characters that end a word for suggestion purposes. */
+        private val WORD_SEPARATORS = charArrayOf(' ', '\n', '\t', '.', ',', '!', '?', ';', ':')
+
+        /**
+         * Below this length every dictionary word is within one edit, so suggestions would be
+         * noise rather than help.
+         */
+        private const val MIN_WORD_FOR_SUGGESTIONS = 3
     }
 }
