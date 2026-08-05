@@ -341,10 +341,18 @@ class WearKeyImeService : InputMethodService() {
     private fun switchLanguage() {
         if (switchToNextInputMethod(true)) return
         val grid = surfaceView?.keyGrid ?: return
-        grid.layout = when (grid.layout) {
+        val next = when (grid.layout) {
             KeyGridView.Layout.EN_US -> KeyGridView.Layout.RU_RU
             KeyGridView.Layout.RU_RU -> KeyGridView.Layout.EN_US
         }
+        grid.layout = next
+        // The framework only registers one implicit subtype on this watch, so this local fallback
+        // is the path that actually runs in ordinary use. It previously swapped the key labels but
+        // forgot the dictionary, leaving Russian typing backed by en.bin (found on-device: layout
+        // was Cyrillic while no_backup contained only en.bin). Keep the resident index in lockstep
+        // with the visible layout, exactly as onCurrentInputMethodSubtypeChanged does.
+        dictionaryLoader.loadFor(next)
+        surfaceView?.suggestionStrip?.clear()
     }
 
     /**
