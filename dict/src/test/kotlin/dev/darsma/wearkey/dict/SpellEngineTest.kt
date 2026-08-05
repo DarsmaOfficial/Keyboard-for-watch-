@@ -123,7 +123,7 @@ class SpellEngineTest {
             "halo" to 107
         )
         val suggestions = engine.suggest("helo")
-        assertTrue("hello" in suggestions, "expected 'hello' among $suggestions")
+        assertEquals("hello", suggestions.first(), "expected 'hello' first, got $suggestions")
         assertFalse("halo" in suggestions, "'halo' is rarer than 'hello': $suggestions")
     }
 
@@ -141,7 +141,23 @@ class SpellEngineTest {
             "helm" to 110,
             "halo" to 107
         )
-        assertEquals(listOf("help", "held", "hero", "hello"), engine.suggest("helo"))
+        assertEquals(listOf("hello", "help", "held", "hero"), engine.suggest("helo"))
+    }
+
+    /**
+     * Words several edits away must never be offered. Found on the watch: typing "hel" produced
+     * "the / he / she", because words that merely share a delete variant were accepted without
+     * checking the real distance — and being common words, they outranked the correct candidates.
+     */
+    @Test
+    fun distantWordsAreNeverOffered() {
+        val engine = engineWith(
+            "the" to 116854, "he" to 9734, "she" to 4516, "help" to 1382
+        )
+        val suggestions = engine.suggest("hel")
+        assertFalse("the" in suggestions, "'the' is three edits from 'hel': $suggestions")
+        assertFalse("she" in suggestions, "'she' is two edits from 'hel': $suggestions")
+        assertEquals("help", suggestions.first())
     }
 
     @Test

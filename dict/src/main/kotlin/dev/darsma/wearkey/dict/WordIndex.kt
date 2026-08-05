@@ -63,9 +63,9 @@ class WordIndex private constructor(
     fun lookup(term: String, limit: Int): List<String> {
         if (term.isEmpty() || wordCount == 0) return emptyList()
 
-        // Small fixed-size scratch: candidates are gathered as word indices, deduplicated, then
-        // resolved to strings once. Word indices are ascending in frequency rank, so sorting the
-        // indices sorts by frequency for free.
+        // Candidates are gathered as word indices, deduplicated, then resolved to strings once.
+        // Indices are in descending frequency order, so iterating a sorted set yields the most
+        // common candidates first without any sorting per keystroke.
         val found = sortedSetOf<Int>()
 
         collectInto(found, term)
@@ -77,12 +77,120 @@ class WordIndex private constructor(
         }
 
         if (found.isEmpty()) return emptyList()
-        val result = ArrayList<String>(minOf(limit, found.size))
+
+        // Score every surviving candidate, then take the best. Scoring is
+        //     frequency x P(this typo | this word)
+        // rather than frequency alone. Corpus frequency answers "which word is more common",
+        // but the question here is "which word was this person trying to type", and those differ:
+        // on the watch, "helo" ranked hello 5th behind help/held/hero/hell purely because those
+        // are commoner words, even though omitting one of a doubled letter is a far more likely
+        // slip than typing a different word entirely.
+        val scored = ArrayList<ScoredCandidate>(found.size)
         for (index in found) {
-            result.add(wordAt(index))
+            val candidate = wordAt(index)
+            // The delete-variant table is a *filter*, not an answer: two words sharing a delete
+            // variant can still be far apart. "hel" and "the" both reduce to "he", so without this
+            // check the row offered "the / he / she" for "hel" — words two and three edits away.
+            val kind = editKind(term, candidate) ?: continue
+            scored.add(ScoredCandidate(candidate, frequencyAt(index).toLong() * kind.weight))
+        }
+
+        scored.sortWith(compareByDescending { it.score })
+        val result = ArrayList<String>(minOf(limit, scored.size))
+        for (candidate in scored) {
+            result.add(candidate.word)
             if (result.size >= limit) break
         }
         return result
+    }
+
+    private class ScoredCandidate(val word: String, val score: Long)
+
+    /**
+     * How likely each kind of single-character slip is, relative to the others.
+     *
+     * These are ordering weights, not probabilities — only their ratios matter. They encode three
+     * well-established observations about typing errors, and they are deliberately mild so that a
+     * much commoner word still wins on frequency:
+     *
+     *  - **Doubling errors dominate.** Typing one letter where the word has two identical ones
+     *    ("helo" for "hello", "adress" for "address") is the single most frequent real-world
+     *    misspelling pattern, and it is a pure motor slip rather than a different intended word.
+     *  - **Exact prefix matches are strong.** If the typed text is the start of the candidate, the
+     *    user is most likely mid-word rather than mistaken.
+     *  - **Substitution is the weakest signal.** Changing a letter usually produces a *different
+     *    real word*, which is far more often what the user meant than a typo of something else.
+     */
+    private enum class EditKind(val weight: Long) {
+        /** Candidate has a doubled letter the typed text is missing: helo -> hello. */
+        DOUBLED_LETTER(24),
+        /** Typed text is a prefix of the candidate: hel -> help. */
+        PREFIX(8),
+        /** Any other single insertion. */
+        INSERTION(4),
+        /**
+         * Candidate is the typed text with one character removed.
+         *
+         * Weighted below substitution on purpose. Someone mid-word has typed a genuine prefix, and
+         * a shorter dictionary word is almost never what they want: for "hel" the plain word "he"
+         * would otherwise win on frequency alone and push "help" down the row, which is the
+         * opposite of useful while typing.
+         */
+        DELETION(1),
+        /** One character replaced by another. */
+        SUBSTITUTION(1)
+    }
+
+    /**
+     * Classifies how [candidate] differs from [typed], or null when they are more than one edit
+     * apart.
+     *
+     * Deliberately not a general Levenshtein routine: at distance 1 the answer is decidable in a
+     * single pass with no allocation and no matrix, which matters because this runs for every
+     * candidate on every keystroke.
+     */
+    private fun editKind(typed: String, candidate: String): EditKind? {
+        val lengthDelta = candidate.length - typed.length
+        if (lengthDelta > 1 || lengthDelta < -1) return null
+
+        if (lengthDelta == 0) {
+            var differences = 0
+            for (i in typed.indices) {
+                if (typed[i] != candidate[i] && ++differences > 1) return null
+            }
+            // Identical strings reach here when the typed text is itself a dictionary word; treat
+            // it as the strongest possible match so it is never displaced by a correction.
+            return if (differences == 0) EditKind.PREFIX else EditKind.SUBSTITUTION
+        }
+
+        val longer = if (lengthDelta > 0) candidate else typed
+        val shorter = if (lengthDelta > 0) typed else candidate
+
+        var i = 0
+        var j = 0
+        var insertedAt = -1
+        while (i < longer.length && j < shorter.length) {
+            if (longer[i] != shorter[j]) {
+                if (insertedAt >= 0) return null
+                insertedAt = i
+                i++
+            } else {
+                i++
+                j++
+            }
+        }
+        // Ran off the end of the shorter string: the extra character is the final one.
+        if (insertedAt < 0) insertedAt = longer.length - 1
+
+        if (lengthDelta < 0) return EditKind.DELETION
+
+        // The inserted character duplicates its neighbour, i.e. the user typed one of a pair.
+        val inserted = longer[insertedAt]
+        val doubles = (insertedAt > 0 && longer[insertedAt - 1] == inserted) ||
+            (insertedAt < longer.length - 1 && longer[insertedAt + 1] == inserted)
+        if (doubles) return EditKind.DOUBLED_LETTER
+
+        return if (insertedAt >= shorter.length) EditKind.PREFIX else EditKind.INSERTION
     }
 
     /** True when [term] is itself a word in the index. */

@@ -61,6 +61,67 @@ class WordIndexTest {
         assertTrue("привет" in index.lookup("привт", limit = 4))
     }
 
+    /**
+     * Regression test for a defect found on the watch: typing "hel" offered "the / he / she".
+     *
+     * The delete-variant table is a *filter*, not an answer — two words can share a delete variant
+     * and still be several edits apart. "hel" and "the" both reduce to "he", so gathering bucket
+     * members without verifying the real edit distance produced confident, completely wrong
+     * suggestions. Worse, they outranked the correct ones because they are common words.
+     */
+    @Test
+    fun lookup_rejectsCandidatesMoreThanOneEditAway() {
+        val index = WordIndex.from(
+            TestIndex.build(mapOf("the" to 116854, "he" to 9734, "she" to 4516, "help" to 1382))
+        )!!
+        val hits = index.lookup("hel", limit = 4)
+        assertTrue("help" in hits, "'help' is one edit from 'hel': $hits")
+        assertTrue("the" !in hits, "'the' is three edits from 'hel': $hits")
+        assertTrue("she" !in hits, "'she' is two edits from 'hel': $hits")
+        // "he" is one deletion from "hel", so it legitimately stays.
+        assertTrue("he" in hits, "'he' is one edit from 'hel': $hits")
+    }
+
+    /**
+     * The ranking model, pinned with the real shipped frequencies.
+     *
+     * Candidates are scored as `frequency x P(this slip | this word)` rather than by frequency
+     * alone. Corpus frequency answers "which word is commoner"; the question the keyboard actually
+     * faces is "which word was this person trying to type". On the device, ranking "helo" by
+     * frequency alone put hello 5th behind help/held/hero/hell and off the end of the row, even
+     * though omitting one of a doubled letter is a far likelier slip than typing a different word.
+     */
+    @Test
+    fun doubledLetterTypo_outranksCommonerNeighbours() {
+        val index = WordIndex.from(
+            TestIndex.build(
+                mapOf(
+                    "help" to 1382, "held" to 559, "hero" to 166,
+                    "hell" to 161, "hello" to 119, "helm" to 110, "halo" to 107
+                )
+            )
+        )!!
+        assertEquals("hello", index.lookup("helo", limit = 4).first())
+    }
+
+    /** A prefix match must beat a shorter word, however common that shorter word is. */
+    @Test
+    fun prefixMatch_outranksAShorterWord() {
+        val index = WordIndex.from(TestIndex.build(mapOf("he" to 9734, "help" to 1382)))!!
+        assertEquals("help", index.lookup("hel", limit = 4).first())
+    }
+
+    @Test
+    fun lookup_acceptsAllThreeSingleEditKinds() {
+        val index = WordIndex.from(
+            TestIndex.build(mapOf("cat" to 9, "cot" to 8, "cart" to 7, "at" to 6))
+        )!!
+        val hits = index.lookup("cat", limit = 8)
+        assertTrue("cot" in hits, "substitution: $hits")
+        assertTrue("cart" in hits, "insertion: $hits")
+        assertTrue("at" in hits, "deletion: $hits")
+    }
+
     @Test
     fun from_rejectsGarbage() {
         val bogus = java.nio.ByteBuffer.allocate(8)
