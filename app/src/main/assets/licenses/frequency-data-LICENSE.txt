@@ -1,0 +1,46 @@
+Word frequency data — Wortschatz Leipzig Corpora Collection
+===========================================================
+
+The frequency value stored beside each word in this application's dictionaries is derived from
+the aggregate word-count tables of the Leipzig Corpora Collection:
+
+    eng_news_2020_100K
+    rus_news_2022_100K
+
+Attribution
+-----------
+
+Word frequency data derived from the Wortschatz Leipzig Corpora Collection
+(https://wortschatz.uni-leipzig.de/), Natural Language Processing Group,
+Leipzig University.
+
+Reference:
+
+    D. Goldhahn, T. Eckart, U. Quasthoff.
+    Building Large Monolingual Dictionaries at the Leipzig Corpora Collection:
+    From 100 to 200 Languages.
+    Proceedings of the 8th International Conference on Language Resources and
+    Evaluation (LREC'12), 2012.
+
+Licence
+-------
+
+The downloadable text corpora of the Leipzig Corpora Collection are made available under the
+Creative Commons Attribution 4.0 International licence (CC BY 4.0).
+
+    https://creativecommons.org/licenses/by/4.0/
+
+You are free to share and adapt the material for any purpose, including commercially, provided
+you give appropriate credit, provide a link to the licence, and indicate if changes were made.
+CC BY 4.0 imposes no share-alike requirement.
+
+Statement of changes
+--------------------
+
+Only the aggregate word/count column of the corpus was read. Counts were folded to lowercase and
+summed, and were retained solely for words that already appear in this application's own word
+lists (which come from separate sources — see the SCOWL and Lebedev notices). No corpus
+sentences, documents or source URLs are included in this application.
+
+The exact procedure is recorded in tools/build_frequencies.py in the project's source
+repository.

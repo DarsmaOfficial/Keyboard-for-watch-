@@ -17,14 +17,28 @@ The project's own licence is Apache-2.0 — see [`LICENSE`](LICENSE) and [`NOTIC
 | SymSpellKt | 3.4.0 | MIT | https://github.com/Darkrock-Studios/SymSpellKt |
 | English word list (SCOWL, via `wooorm/dictionaries`) | 2020.12.07 | BSD-style | https://github.com/wooorm/dictionaries |
 | Russian word list (Lebedev, via `wooorm/dictionaries`) | 2020 | BSD | https://github.com/wooorm/dictionaries |
+| Word frequency counts (Wortschatz Leipzig Corpora Collection) | eng_news_2020, rus_news_2022 | CC BY 4.0 | https://wortschatz.uni-leipzig.de/en/download |
 
 The word lists are derived from the upstream Hunspell `.dic` files: affix flags stripped, entries
 lowercased and de-duplicated, capped at 30 000 words per language. The exact procedure is in
 [`tools/build_dictionaries.py`](tools/build_dictionaries.py). The Hunspell *engine* is never
 shipped — only the data, which is permissively licensed.
 
-Both word-list licences require the notice to be reproduced in **binary** redistributions, so
-their full texts are bundled into the APK and shown by the in-app licences screen.
+The frequency number beside each word is what lets autocorrect rank equally-close candidates
+(without it, "helo" offered "halo / held / helm" and never "hello" — every candidate tied at
+frequency 1). Counts come from the Leipzig news corpora, whose **downloadable text corpora are
+released under CC BY**, an attribution-only licence compatible with this project — see
+<https://wortschatz.uni-leipzig.de/en/usage>. Only the aggregate word-count column is read, and
+only for words already in our list, so no corpus sentences are redistributed. Note that Leipzig's
+*web applications and query data* carry the more restrictive CC BY-NC terms; those are a different
+asset and are not used. The procedure is in
+[`tools/build_frequencies.py`](tools/build_frequencies.py).
+
+`hermitdave/FrequencyWords` was rejected for this purpose: its content is CC-BY-SA, a share-alike
+obligation on the data that would propagate to every downstream redistributor.
+
+All three data licences require their notice to travel with **binary** redistributions, so the
+full texts are bundled into the APK and shown by the in-app licences screen.
 
 In particular this release still contains:
 
@@ -114,6 +128,33 @@ Copyright (c) 1997-2008, Alexander I. Lebedev
 The full BSD conditions and disclaimer must accompany it. Note that the clause
 "Redistributions in binary form must reproduce the above copyright notice…" applies to the
 **APK**, not merely to the source tree — hence the in-app licences screen.
+
+### Word frequency counts — Wortschatz Leipzig Corpora Collection (CC BY 4.0)
+
+Frequency values in `assets/dictionaries/*.txt` are derived from the aggregate word-count tables
+of the Leipzig Corpora Collection (`eng_news_2020_100K`, `rus_news_2022_100K`).
+
+```
+Word frequency data derived from the Wortschatz Leipzig Corpora Collection
+(https://wortschatz.uni-leipzig.de/), Natural Language Processing Group,
+Leipzig University.
+
+Licensed under the Creative Commons Attribution 4.0 International licence
+(CC BY 4.0): https://creativecommons.org/licenses/by/4.0/
+
+Reference:
+D. Goldhahn, T. Eckart, U. Quasthoff. Building Large Monolingual Dictionaries
+at the Leipzig Corpora Collection: From 100 to 200 Languages.
+In: Proceedings of the 8th International Language Resources and Evaluation
+(LREC'12), 2012.
+
+Changes made: only the aggregate word/count column was read; counts were folded
+to lowercase, summed, and retained solely for words already present in this
+project's own word lists. No corpus sentences are redistributed.
+```
+
+CC BY 4.0 requires attribution and a statement of changes, both given above; it imposes no
+share-alike obligation, so it does not affect the licensing of this project or of the APK.
 
 ### Explicitly rejected
 

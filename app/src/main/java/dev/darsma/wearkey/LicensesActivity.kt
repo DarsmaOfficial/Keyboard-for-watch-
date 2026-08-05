@@ -27,7 +27,10 @@ class LicensesActivity : Activity() {
         // redistributions to reproduce the notice — so these must be viewable in the app
         // itself, not merely in the repository (spec §3.2).
         "dictionary-en-SCOWL-LICENSE.txt" to "English word list (SCOWL)",
-        "dictionary-ru-LICENSE.txt" to "Russian word list (Lebedev)"
+        "dictionary-ru-LICENSE.txt" to "Russian word list (Lebedev)",
+        // CC BY requires attribution and a statement of changes to accompany the data wherever
+        // it travels, which includes the APK.
+        "frequency-data-LICENSE.txt" to "Word frequencies (Leipzig, CC BY)"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {

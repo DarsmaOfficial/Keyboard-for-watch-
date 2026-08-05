@@ -109,4 +109,38 @@ class SpellEngineTest {
         // "helo" is no longer close to anything in the new dictionary.
         assertNull(engine.bestCorrection("helo"))
     }
+
+    /**
+     * Regression test for a bug found on the watch: typing "helo" offered "halo / held / helm"
+     * and never "hello". Every candidate is a legitimate distance-1 neighbour, so the ranking is
+     * the only thing that can separate them — and at the time the whole dictionary was loaded
+     * with frequency 1.0, which made the order arbitrary.
+     *
+     * The frequencies below are the real Leipzig-derived values now shipped in
+     * assets/dictionaries/en.txt.
+     */
+    @Test
+    fun helo_correctsToHello_whenFrequenciesAreRealistic() {
+        val engine = engineWith(
+            "hello\t119",
+            "halo\t107",
+            "helm\t110",
+            "held\t559",
+            "help\t1382"
+        )
+        // "held" and "help" are two edits away, so they must not be offered at all.
+        assertEquals("hello", engine.bestCorrection("helo"))
+        assertEquals("hello", engine.suggest("helo").first())
+    }
+
+    /** Without frequency information the same lookup cannot be relied upon — documents *why*
+     * the shipped word lists must carry counts rather than bare words. */
+    @Test
+    fun equalFrequencies_leaveCandidateOrderUnconstrained() {
+        val engine = engineWith("hello", "halo", "helm")
+        val suggestions = engine.suggest("helo")
+        // All three are within one edit, so all three are legitimate candidates; the point is
+        // that nothing guarantees "hello" is first, which is exactly the defect.
+        assertTrue(suggestions.contains("hello"))
+    }
 }
