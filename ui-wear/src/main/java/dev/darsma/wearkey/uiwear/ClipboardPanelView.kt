@@ -31,7 +31,7 @@ class ClipboardPanelView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    fun interface Listener {
+    interface Listener {
         fun onPaste(text: String)
         fun onPin(text: String, pinned: Boolean)
         fun onDelete(text: String)

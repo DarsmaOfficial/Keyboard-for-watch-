@@ -49,6 +49,42 @@ jobs:
             exit 1
           fi
 
+      - name: Verify APK contains no native libraries (spec §3 item 2 — 32-bit ABI trap)
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          if unzip -l "$APK" | grep -q "lib/"; then
+            echo "::error::APK contains native libraries — this project is pure Kotlin/JVM by design"
+            unzip -l "$APK" | grep "lib/"
+            exit 1
+          fi
+
+      - name: Verify no INTERNET / RECORD_AUDIO permission (spec §3 items 3 and 5)
+        run: |
+          MANIFEST=app/src/main/AndroidManifest.xml
+          for PERM in "android.permission.INTERNET" "android.permission.RECORD_AUDIO"; do
+            if grep -q "$PERM" "$MANIFEST"; then
+              echo "::error::$PERM appears in the manifest — forbidden by the project's offline/touch-only guarantees"
+              exit 1
+            fi
+          done
+
+      - name: Verify no keystroke logging in key-handling paths (spec §11.5 security)
+        run: |
+          if grep -rnE "Log\.[dviwe]\(" app/src/main ui-wear/src/main ime-core/src/main; then
+            echo "::error::logging call found in keyboard source — a keyboard must never log keystrokes"
+            exit 1
+          fi
+
+      - name: Report APK size (budget: 15 MB, spec §3 item 4)
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          BYTES=$(stat -c%s "$APK")
+          echo "APK size: $BYTES bytes ($((BYTES / 1024)) KB)"
+          if [ "$BYTES" -gt 15728640 ]; then
+            echo "::error::APK exceeds the 15 MB budget"
+            exit 1
+          fi
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
