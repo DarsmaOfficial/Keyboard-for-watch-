@@ -149,6 +149,13 @@ class KeyGridView @JvmOverloads constructor(
         computeLayout()
     }
 
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        // getLocationOnScreen() is only meaningful once the view has actually been positioned,
+        // and computeLayout() depends on it to find the display circle's centre.
+        if (changed) computeLayout()
+    }
+
     /**
      * Round-display layout (spec §7.1). A rectangular grid on a 466x466 circular screen clips
      * the outer keys of every row — Q/P, A/L, Z/M literally lose usable area to the bezel, which
@@ -182,12 +189,21 @@ class KeyGridView @JvmOverloads constructor(
         val rowHeight = (gridHeight - funcRowHeight) / 3f
         labelPaint.textSize = rowHeight * 0.46f
 
-        val screenH = resources.displayMetrics.heightPixels.toFloat()
+        // Locate this view within the PHYSICAL display, rather than assuming it is flush with
+        // the screen bottom. displayMetrics reports the IME window, not the round glass, so
+        // deriving the circle from it pushed the outer keys past the bezel (P/L/M/Enter were
+        // visibly clipped on real hardware even though screenshots looked fine).
+        val loc = IntArray(2)
+        getLocationOnScreen(loc)
+        val viewTopOnScreen = loc[1].toFloat()
+        val viewLeftOnScreen = loc[0].toFloat()
+
         val screenW = resources.displayMetrics.widthPixels.toFloat()
+        val screenH = resources.displayMetrics.heightPixels.toFloat()
         val radius = minOf(screenW, screenH) / 2f
-        // Where the display's circle centre lies relative to this view's top edge.
-        val circleCenterYInView = radius - (screenH - height)
-        val circleCenterX = width / 2f
+        // Circle centre expressed in this view's own coordinate space.
+        val circleCenterYInView = radius - viewTopOnScreen
+        val circleCenterX = radius - viewLeftOnScreen
 
         for ((rowIndex, row) in letterRows.withIndex()) {
             val top = gridTop + rowIndex * rowHeight
@@ -356,7 +372,11 @@ class KeyGridView @JvmOverloads constructor(
     companion object {
         /** Gap drawn between adjacent keys. Small — touch slop is handled in [keyAt] instead. */
         private const val KEY_GAP_PX = 3f
-        /** Keeps the outermost keys clear of the physical bezel curve. */
-        private const val KEY_EDGE_INSET_PX = 2f
+        /**
+         * Keeps the outermost keys clear of the physical bezel curve. Generous on purpose:
+         * the glass curves away near the rim, so a key drawn right at the computed chord is
+         * still hard to see and hit on real hardware.
+         */
+        private const val KEY_EDGE_INSET_PX = 10f
     }
 }
