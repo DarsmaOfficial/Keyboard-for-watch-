@@ -3,7 +3,7 @@ package dev.darsma.wearkey
 import android.content.Context
 import dev.darsma.wearkey.dict.SpellEngine
 import dev.darsma.wearkey.uiwear.KeyGridView
-import java.io.File
+import java.io.FileInputStream
 import java.nio.channels.FileChannel
 import java.util.concurrent.Executors
 
@@ -73,30 +73,24 @@ class DictionaryLoader(
     }
 
     /**
-     * Returns a read-only mapping of the named index, extracting it into app storage on first use.
+     * Returns a read-only mapping directly into the APK's stored asset.
      *
-     * The extracted copy is validated by size: a partially written file from an interrupted
-     * earlier run would otherwise be mapped and rejected forever.
+     * `openFd` exposes three things: the APK file descriptor, the byte offset at which this asset
+     * starts, and its length. Because `.bin` is explicitly `noCompress`, those bytes are the
+     * original file and can be mapped in place — no extraction, no duplicate in app storage, and
+     * the same clean pages can be shared across process restarts.
+     *
+     * A direct mapping also avoids a real failure found on-device in the first implementation:
+     * EN extracted and mapped, but switching to RU changed the visible keys while `ru.bin` never
+     * appeared in `no_backup`, silently leaving English correction active. Removing extraction
+     * removes that whole failure mode.
      */
     private fun mapIndex(assetName: String): java.nio.ByteBuffer {
-        val target = File(context.noBackupFilesDir, assetName)
-        val expected = context.assets.openFd("dictionaries/$assetName").use { it.length }
-
-        if (!target.exists() || target.length() != expected) {
-            val temporary = File(context.noBackupFilesDir, "$assetName.part")
-            context.assets.open("dictionaries/$assetName").use { input ->
-                temporary.outputStream().use { output -> input.copyTo(output) }
+        val descriptor = context.assets.openFd("dictionaries/$assetName")
+        return descriptor.use { asset ->
+            FileInputStream(asset.fileDescriptor).channel.use { channel ->
+                channel.map(FileChannel.MapMode.READ_ONLY, asset.startOffset, asset.length)
             }
-            // Rename only once the copy is complete, so an interrupted extraction can never be
-            // mistaken for a valid index.
-            if (!temporary.renameTo(target)) {
-                temporary.delete()
-                throw IllegalStateException("could not place $assetName")
-            }
-        }
-
-        return FileChannel.open(target.toPath()).use { channel ->
-            channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size())
         }
     }
 
