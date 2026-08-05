@@ -79,6 +79,15 @@ class WearKeyImeService : InputMethodService() {
             strip.clear()
             return
         }
+        // A correctly spelled dictionary word needs no correction row. This also prevents a race
+        // after accepting a chip: replaceCurrentWord() clears the strip, but EditorState's
+        // synchronous change notification immediately refreshes it for the replacement word and
+        // used to put the same chips straight back on screen (observed on-device after accepting
+        // "hello").
+        if (spellEngine.isKnown(word)) {
+            strip.clear()
+            return
+        }
         strip.setSuggestions(spellEngine.suggest(word))
     }
 
