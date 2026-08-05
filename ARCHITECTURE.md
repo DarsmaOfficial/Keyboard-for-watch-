@@ -22,9 +22,43 @@ still filled the screen, which reproduced the original problem with extra steps.
 
 ```
 :ime-core     pure Kotlin/JVM — no Android imports, unit-testable without a device
+:dict         pure Kotlin/JVM — SymSpell autocorrect engine, unit-testable without a device
 :ui-wear      the keyboard surface — View + Canvas only, zero androidx.compose.*
 :app          InputMethodService, LAUNCH_KEYBOARD activity, manifest
 ```
+
+## Dictionary size — measured, not assumed
+
+The single most expensive decision in the project. Numbers below are `dumpsys meminfo`
+`Dalvik Heap → Alloc` on the actual watch, from a cold process:
+
+| State | Dalvik heap allocated |
+|---|---|
+| No dictionary resident | 2.3 MB |
+| One resident dictionary, 30 000 words | **39.8 MB** |
+| One resident dictionary, 10 000 words | see `CHANGELOG` for the current measurement |
+
+The spec's gate (§14) is **under 8 MB**, and its §4.2 budget assumed 10 000 words per language at
+roughly 3.7 MB. An earlier revision shipped 30 000 words without reconciling that against the
+budget, and blew the gate by nearly five times: SymSpell's delete-variant table grows worse than
+linearly, so tripling the word count cost roughly ten times the heap.
+
+Two measurement traps cost real time here, recorded so they are not repeated:
+
+- **Read `Dalvik Heap → Alloc`, not `App Summary → Java Heap`.** The summary line folds in
+  `Dalvik Other` and the shared ART boot-image mapping, so it reported ~47 MB for a process
+  *without* any dictionary — higher than one with a dictionary loaded. It cannot be compared
+  against the spec's gate at all.
+- **`am kill` does not restart the active IME.** The framework recreates `WearKeyImeService`
+  almost immediately, so a "baseline" taken that way has already loaded a word list.
+  `am force-stop` gives a genuinely cold process, but it also makes the framework treat the IME as
+  uninstalled — it must be `ime enable`d again afterwards, with a few seconds' delay before the
+  call is accepted.
+
+Which 10 000 words matters as much as how many. The list keeps the most *frequent* words, ranked
+from the Leipzig corpora, not the *shortest* ones. Every shipped word is corpus-attested, so
+obscure two-letter entries that could never be a useful suggestion are gone while common longer
+words the old length cut-off excluded are now present.
 
 ### `:ime-core`
 

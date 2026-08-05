@@ -6,6 +6,33 @@ is reached.
 
 ## [Unreleased]
 
+### Fixed
+- **Keys no longer move under your finger.** The candidate row was removed from the layout when it
+  had nothing to offer, so the moment a suggestion appeared mid-word every key row shifted down by
+  its height and the next tap landed on the wrong thing — typing "helo" reliably produced "del".
+  The row's height is now reserved permanently, so key geometry is fixed for as long as a field is
+  focused.
+- **Autocorrect suggests the word you meant.** The shipped word lists carried no frequency
+  information, so all 10 000 entries loaded at the same weight and the ordering among
+  equally-close candidates was arbitrary: "helo" offered "halo / held / helm" and never "hello".
+  Each word now carries a real frequency, and candidates are ranked by it.
+- **Java heap is back inside its budget.** One resident dictionary measured **39.8 MB** of Dalvik
+  heap on the watch against the specification's 8 MB gate, because the lists shipped 30 000 words
+  where the heap budget was calculated for 10 000. Reduced to 10 000, which is what the design
+  always assumed; `ARCHITECTURE.md` records the measurements and the two `dumpsys` traps that made
+  the earlier numbers misleading.
+
+### Changed
+- Word lists are now frequency-ranked rather than length-ranked, so the 10 000 kept words are the
+  most *common* ones instead of the *shortest* ones. Every shipped word is attested in a real
+  corpus: obscure two-letter entries that could never be a useful suggestion are gone, and common
+  longer words the length cut-off used to exclude are present. A smaller list therefore suggests
+  better than the larger one it replaces.
+- The candidate row offers four words instead of three. "helo" has six neighbours at edit
+  distance 1, and at three chips the intended word fell just off the end.
+- CI now fails if a word list exceeds 10 000 entries or loses its frequency column — the heap
+  overrun and the ranking defect were both invisible to every existing gate.
+
 ### Added
 - Clipboard history (spec §6): panel replacing the key grid, one-tap paste, pin/unpin, delete,
   clear-all. Entries that look like one-time codes or card numbers are flagged and expire after

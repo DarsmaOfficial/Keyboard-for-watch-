@@ -90,6 +90,15 @@ class SpellEngine(
     }
 
     companion object {
-        const val MAX_SUGGESTIONS = 3
+        /**
+         * How many candidates the keyboard offers at once.
+         *
+         * Four rather than three, decided from on-device behaviour: typing "helo" produces
+         * help / held / hero / hello / helm / halo, all at edit distance 1 and correctly ordered
+         * by real frequency — but at three chips the word the user almost certainly meant fell
+         * just off the end. A 466 px display fits four chips legibly, and offering one more costs
+         * nothing in heap since the candidates are computed either way.
+         */
+        const val MAX_SUGGESTIONS = 4
     }
 }

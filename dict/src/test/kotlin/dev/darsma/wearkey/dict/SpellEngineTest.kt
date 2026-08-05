@@ -141,6 +141,37 @@ class SpellEngineTest {
         assertFalse("halo" in suggestions, "'halo' is rarer than 'hello': $suggestions")
     }
 
+    /**
+     * "helo" has six distance-1 neighbours in the real word list, and on the device the one the
+     * user meant ("hello", 4th by frequency) fell just off the end of a three-chip row. This pins
+     * the widened row so the cap cannot silently drop back.
+     */
+    @Test
+    fun fourCandidates_areOfferedWhenAvailable() {
+        val engine = engineWith(
+            "help\t1382",
+            "held\t559",
+            "hero\t166",
+            "hello\t119",
+            "helm\t110",
+            "halo\t107"
+        )
+        val suggestions = engine.suggest("helo")
+        assertEquals(4, suggestions.size, "expected four chips, got $suggestions")
+        assertEquals(listOf("help", "held", "hero", "hello"), suggestions)
+    }
+
+    /**
+     * The shipped lists are `word<TAB>frequency`. A list that silently lost its frequency column
+     * would still load and still "work", but every candidate would tie at 1.0 and ranking would
+     * go back to being arbitrary — the original defect. Assert the parse explicitly.
+     */
+    @Test
+    fun load_parsesTabSeparatedFrequencies() {
+        val engine = engineWith("aaa\t5", "aab\t9999")
+        assertEquals("aab", engine.suggest("aac").first())
+    }
+
     /** The ordering invariant the fix relies on: more frequent candidates come first. */
     @Test
     fun suggestions_areOrderedByFrequency() {

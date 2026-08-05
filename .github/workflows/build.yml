@@ -96,6 +96,31 @@ jobs:
             exit 1
           fi
 
+      - name: Verify dictionary size and frequency column (spec §4.2 heap budget)
+        run: |
+          # The 8 MB java-heap gate (spec §14) is set by how many words SymSpell holds, and
+          # SymSpell's delete-variant table grows worse than linearly. A revision that shipped
+          # 30 000 words instead of the budgeted 10 000 measured 39.8 MB of Dalvik heap on the
+          # watch — nearly five times the gate — and nothing in CI noticed. This is that check.
+          FAIL=0
+          for f in app/src/main/assets/dictionaries/*.txt; do
+            LINES=$(wc -l < "$f")
+            echo "$f: $LINES words"
+            if [ "$LINES" -gt 10000 ]; then
+              echo "::error::$f has $LINES words; the measured heap budget allows 10000"
+              FAIL=1
+            fi
+            # Every entry must carry a tab-separated frequency. Without it each word loads at
+            # frequency 1.0 and candidate ranking silently becomes arbitrary, which is a quality
+            # regression that no build error would ever surface.
+            MISSING=$(grep -cv "$(printf '\t')" "$f" || true)
+            if [ "$MISSING" -ne 0 ]; then
+              echo "::error::$f has $MISSING entries with no frequency column"
+              FAIL=1
+            fi
+          done
+          [ "$FAIL" -eq 0 ]
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

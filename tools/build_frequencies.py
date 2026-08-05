@@ -45,13 +45,17 @@ from pathlib import Path
 
 BASE = "https://downloads.wortschatz-leipzig.de/corpora"
 
-# The 100K-sentence editions are the smallest that still give stable counts for a 30k word list
+# The 100K-sentence editions are the smallest that still give stable counts for a 10k word list
 # (~25 MB download, ~150k word types). Larger editions change nothing about the ranking that
 # matters here and cost ten times the bandwidth.
 CORPORA = {
     "en": "eng_news_2020_100K",
     "ru": "rus_news_2022_100K",
 }
+
+# Corpus-attested words are stored as `count + this`, so every attested word outranks every
+# unattested one no matter how rare it is. Unattested words occupy 1..this.
+UNATTESTED_CEILING = 100
 
 
 def fetch_corpus(name: str, cache_dir: Path) -> Path:
@@ -93,6 +97,26 @@ def read_counts(archive: Path, name: str) -> Counter:
     return counts
 
 
+def counts_for(lang: str, cache: Path) -> Counter:
+    """Lowercased word counts for [lang]. Shared with build_dictionaries.py."""
+    name = CORPORA[lang]
+    return read_counts(fetch_corpus(name, cache), name)
+
+
+def frequency_for(word: str, counts: Counter) -> int:
+    """The frequency value stored beside [word] in the shipped list.
+
+    Attested words get their corpus count offset above UNATTESTED_CEILING. Unattested words still
+    need a defensible order rather than one big tie, and shorter words are overwhelmingly the more
+    common ones in every natural language — the same proxy the vocabulary cut-off used before any
+    frequency data was available.
+    """
+    observed = counts.get(word, 0)
+    if observed > 0:
+        return observed + UNATTESTED_CEILING
+    return max(1, 20 - len(word))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("wordlist", type=Path)
@@ -108,24 +132,15 @@ def main() -> int:
     ]
     print(f"{args.lang}: ranking {len(words):,} words")
 
-    name = CORPORA[args.lang]
-    counts = read_counts(fetch_corpus(name, args.cache), name)
-    print(f"  corpus {name}: {len(counts):,} word types")
+    counts = counts_for(args.lang, args.cache)
+    print(f"  corpus {CORPORA[args.lang]}: {len(counts):,} word types")
 
     lines = []
     covered = 0
     for word in words:
-        observed = counts.get(word, 0)
-        if observed > 0:
+        frequency = frequency_for(word, counts)
+        if frequency > UNATTESTED_CEILING:
             covered += 1
-            # Offset keeps every corpus-attested word strictly above every unattested one, so a
-            # word the corpus happens to miss can never outrank one it saw.
-            frequency = observed + 100
-        else:
-            # Unattested words still need a defensible order rather than a mass tie. Shorter
-            # words are overwhelmingly the more common ones — the same proxy build_dictionaries.py
-            # uses to choose which words to ship at all.
-            frequency = max(1, 20 - len(word))
         lines.append(f"{word}\t{frequency}")
 
     args.output.write_text("\n".join(lines) + "\n", encoding="utf-8")

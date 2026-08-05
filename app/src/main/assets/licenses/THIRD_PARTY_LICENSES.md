@@ -20,7 +20,8 @@ The project's own licence is Apache-2.0 — see [`LICENSE`](LICENSE) and [`NOTIC
 | Word frequency counts (Wortschatz Leipzig Corpora Collection) | eng_news_2020, rus_news_2022 | CC BY 4.0 | https://wortschatz.uni-leipzig.de/en/download |
 
 The word lists are derived from the upstream Hunspell `.dic` files: affix flags stripped, entries
-lowercased and de-duplicated, capped at 30 000 words per language. The exact procedure is in
+lowercased and de-duplicated, then frequency-ranked and capped at the 10 000 most common words per
+language (spec §4.2 — measured on the device, see `ARCHITECTURE.md`). The exact procedure is in
 [`tools/build_dictionaries.py`](tools/build_dictionaries.py). The Hunspell *engine* is never
 shipped — only the data, which is permissively licensed.
 
