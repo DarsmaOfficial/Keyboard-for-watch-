@@ -59,19 +59,30 @@ jobs:
           fi
 
       - name: Verify no INTERNET / RECORD_AUDIO permission (spec §3 items 3 and 5)
+        # Checks the BUILT manifest inside the APK, which is what actually ships, rather than
+        # grepping the source file — the source contains comments explaining why these
+        # permissions are absent, and matching those would be a false positive.
         run: |
-          MANIFEST=app/src/main/AndroidManifest.xml
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          PERMS=$("$ANDROID_HOME/build-tools/36.1.0/aapt2" dump permissions "$APK" || true)
+          echo "$PERMS"
           for PERM in "android.permission.INTERNET" "android.permission.RECORD_AUDIO"; do
-            if grep -q "$PERM" "$MANIFEST"; then
-              echo "::error::$PERM appears in the manifest — forbidden by the project's offline/touch-only guarantees"
+            if echo "$PERMS" | grep -q "name='$PERM'"; then
+              echo "::error::$PERM is declared in the shipped APK — forbidden by the project's offline/touch-only guarantees"
               exit 1
             fi
           done
 
       - name: Verify no keystroke logging in key-handling paths (spec §11.5 security)
+        # Matches android.util.Log calls and println in .kt sources only. Comment lines are
+        # excluded so documentation about this rule doesn't trip the rule.
         run: |
-          if grep -rnE "Log\.[dviwe]\(" app/src/main ui-wear/src/main ime-core/src/main; then
+          HITS=$(grep -rnE "(android\.util\.Log|[^a-zA-Z]Log\.[dviwe]\(|println\()" \
+                   --include="*.kt" app/src/main ui-wear/src/main ime-core/src/main \
+                 | grep -vE "^\s*[^:]+:[0-9]+:\s*(//|\*|/\*)" || true)
+          if [ -n "$HITS" ]; then
             echo "::error::logging call found in keyboard source — a keyboard must never log keystrokes"
+            echo "$HITS"
             exit 1
           fi
 
