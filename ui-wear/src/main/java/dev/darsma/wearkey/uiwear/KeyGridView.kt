@@ -150,10 +150,10 @@ class KeyGridView @JvmOverloads constructor(
         get() = when {
             symbolLayerVisible -> if (symbolPage == 0) symbolPage1 else symbolPage2
             layout == Layout.RU_RU -> ruRows
-            // Email/URI fields get '@' and '.' appended to the bottom letter row, so the two
-            // characters those fields always need are one tap away instead of behind the
-            // symbol layer (spec §11.5).
-            emailOrUriHints -> enRows.mapIndexed { i, row -> if (i == 2) row + "@." else row }
+            // Email/URI fields get '@' and '.' on the MIDDLE row, which has spare width, rather
+            // than the bottom row — that one now carries shift and backspace on its flanks
+            // (spec §11.5: those two characters must not be hidden behind the symbol layer).
+            emailOrUriHints -> enRows.mapIndexed { i, row -> if (i == 1) row + "@." else row }
             else -> enRows
         }
 
@@ -313,11 +313,33 @@ class KeyGridView @JvmOverloads constructor(
             val rowLeft = (circleCenterX - halfChord).coerceAtLeast(0f) + KEY_EDGE_INSET_PX
             val rowRight = (circleCenterX + halfChord).coerceAtMost(width.toFloat()) - KEY_EDGE_INSET_PX
             val usableWidth = (rowRight - rowLeft).coerceAtLeast(1f)
-            val keyWidth = usableWidth / row.length
+
+            // Bottom letter row carries shift on the left and backspace on the right, the way
+            // every phone keyboard does it. That keeps the function row down to a handful of
+            // keys so the spacebar can actually be wide — cramming seven keys into one row on a
+            // 233dp round display made every one of them too small to hit.
+            val isBottomLetterRow = rowIndex == letterRows.lastIndex
+            val flankWidth = if (isBottomLetterRow) usableWidth * 0.15f else 0f
+            val charAreaLeft = rowLeft + flankWidth
+            val charAreaWidth = usableWidth - 2 * flankWidth
+            val keyWidth = charAreaWidth / row.length
+
+            if (isBottomLetterRow) {
+                val shiftLabel = when {
+                    symbolLayerVisible -> if (symbolPage == 0) "2/2" else "1/2"
+                    shiftState == ShiftState.CAPS_LOCK -> "⇪"
+                    else -> "⇧"
+                }
+                keys.add(
+                    Key(KeyAction.Shift, shiftLabel,
+                        RectF(rowLeft + KEY_GAP_PX, top + KEY_GAP_PX,
+                            rowLeft + flankWidth - KEY_GAP_PX, bottom - KEY_GAP_PX))
+                )
+            }
 
             for ((colIndex, rawChar) in row.withIndex()) {
                 val char = applyShift(rawChar)
-                val left = rowLeft + colIndex * keyWidth
+                val left = charAreaLeft + colIndex * keyWidth
                 val right = left + keyWidth
                 keys.add(
                     Key(
@@ -325,6 +347,14 @@ class KeyGridView @JvmOverloads constructor(
                         char.toString(),
                         RectF(left + KEY_GAP_PX, top + KEY_GAP_PX, right - KEY_GAP_PX, bottom - KEY_GAP_PX)
                     )
+                )
+            }
+
+            if (isBottomLetterRow) {
+                keys.add(
+                    Key(KeyAction.Backspace, "⌫",
+                        RectF(rowRight - flankWidth + KEY_GAP_PX, top + KEY_GAP_PX,
+                            rowRight - KEY_GAP_PX, bottom - KEY_GAP_PX))
                 )
             }
         }
@@ -344,31 +374,15 @@ class KeyGridView @JvmOverloads constructor(
         val funcRight = (circleCenterX + funcHalfChord).coerceAtMost(width.toFloat()) - KEY_EDGE_INSET_PX
         val funcWidth = (funcRight - funcLeft).coerceAtLeast(1f)
 
-        // Leading key is shift on the letter layer, and the symbol-page switch on the symbol
-        // layer — the same slot, since shift has no meaning among symbols.
-        val leadingAction = if (symbolLayerVisible) KeyAction.Shift else KeyAction.Shift
-        val leadingLabel = when {
-            symbolLayerVisible -> if (symbolPage == 0) "2/2" else "1/2"
-            shiftState == ShiftState.CAPS_LOCK -> "⇪"
-            shiftState == ShiftState.SHIFTED -> "⇧"
-            else -> "⇧"
-        }
-
-        val shiftWidth = funcWidth * 0.155f
-        val symbolWidth = funcWidth * 0.155f
-        val backspaceWidth = funcWidth * 0.155f
-        val clipboardWidth = funcWidth * 0.13f
+        // Only five keys here now — shift and backspace moved up into the bottom letter row —
+        // so the spacebar gets nearly half the row and is comfortably hittable.
+        val symbolWidth = funcWidth * 0.16f
         val switchLangWidth = funcWidth * 0.14f
-        val enterWidth = funcWidth * 0.155f
-        val spaceWidth = funcWidth - shiftWidth - symbolWidth - backspaceWidth -
-            clipboardWidth - switchLangWidth - enterWidth
+        val clipboardWidth = funcWidth * 0.13f
+        val enterWidth = funcWidth * 0.19f
+        val spaceWidth = funcWidth - symbolWidth - switchLangWidth - clipboardWidth - enterWidth
 
         var x = funcLeft
-        keys.add(
-            Key(leadingAction, leadingLabel,
-                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + shiftWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
-        )
-        x += shiftWidth
         keys.add(
             Key(KeyAction.SymbolLayer, if (symbolLayerVisible) "ABC" else "?123",
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + symbolWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
@@ -389,11 +403,6 @@ class KeyGridView @JvmOverloads constructor(
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + clipboardWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
         x += clipboardWidth
-        keys.add(
-            Key(KeyAction.Backspace, "⌫",
-                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + backspaceWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
-        )
-        x += backspaceWidth
         keys.add(
             Key(KeyAction.Enter, actionLabel ?: "⏎",
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, funcRight - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
