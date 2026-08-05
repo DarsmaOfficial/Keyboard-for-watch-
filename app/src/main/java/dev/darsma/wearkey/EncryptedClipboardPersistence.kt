@@ -30,14 +30,12 @@ import javax.crypto.spec.GCMParameterSpec
  */
 class EncryptedClipboardPersistence(context: Context) {
 
-    // Clipboard data belongs in credential-protected storage (spec §6). On devices without a
-    // lock credential this behaves like normal app storage, so it is safe unconditionally.
-    private val ceContext: Context = runCatching {
-        context.createCredentialProtectedStorageContext()
-    }.getOrDefault(context)
-
+    // Clipboard data belongs in credential-protected storage (spec §6). There is no
+    // createCredentialProtectedStorageContext() to call — an ordinary Context already IS
+    // credential-encrypted storage; only device-protected (DE) storage needs an explicit opt-in
+    // via createDeviceProtectedStorageContext(), which is what SettingsStore uses instead.
     private val file: File
-        get() = File(ceContext.filesDir, FILE_NAME)
+        get() = File(context.filesDir, FILE_NAME)
 
     private fun secretKey(): SecretKey? = runCatching {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
