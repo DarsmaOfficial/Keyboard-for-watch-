@@ -75,7 +75,7 @@ jobs:
             exit 1
           fi
 
-      - name: Report APK size (budget: 15 MB, spec §3 item 4)
+      - name: Report APK size against the 15 MB budget (spec §3 item 4)
         run: |
           APK=app/build/outputs/apk/debug/app-debug.apk
           BYTES=$(stat -c%s "$APK")
