@@ -139,10 +139,16 @@ jobs:
           APK=app/build/outputs/apk/debug/app-debug.apk
           FAIL=0
           for lang in en ru; do
-            METHOD=$(unzip -lv "$APK" "assets/dictionaries/$lang.bin" | awk 'NR==4 {print $3}')
-            echo "$lang.bin storage method: $METHOD"
+            ENTRY="assets/dictionaries/$lang.bin"
+            # Match the entry line by name rather than by row number, and read the method from the
+            # field that literally says Stored/Defl:N — column positions in `unzip -lv` shift with
+            # the width of the size values.
+            METHOD=$(unzip -lv "$APK" "$ENTRY" | awk -v e="$ENTRY" '$NF == e {
+              for (i = 1; i <= NF; i++) if ($i == "Stored" || $i ~ /^Defl/) { print $i; exit }
+            }')
+            echo "$lang.bin storage method: ${METHOD:-unknown}"
             if [ "$METHOD" != "Stored" ]; then
-              echo "::error::assets/dictionaries/$lang.bin is $METHOD, must be Stored (see noCompress)"
+              echo "::error::$ENTRY is '${METHOD:-unknown}', must be Stored — a compressed asset cannot be mmap'd (see noCompress in app/build.gradle.kts)"
               FAIL=1
             fi
           done
