@@ -111,6 +111,9 @@ class WearKeyImeService : InputMethodService() {
             }
         }
 
+        // Spec §11.5: "a keyboard that shows QWERTY for a phone-number field is broken."
+        applyInputTypeAwareness(info)
+
         // Clipboard reads are only legal while the IME holds focus (spec §6) — do it here.
         captureSystemClipboard(info)
         // Never leave the clipboard panel open across fields.
@@ -187,13 +190,25 @@ class WearKeyImeService : InputMethodService() {
                     ic.deleteSurroundingText(1, 0)
                 }
                 KeyGridView.KeyAction.Enter -> {
-                    ic.sendKeyEvent(
-                        android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_ENTER)
-                    )
-                    ic.sendKeyEvent(
-                        android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_ENTER)
-                    )
+                    // If the field asked for a specific action (Search / Send / Go / Next /
+                    // Done), perform that instead of inserting a newline — otherwise a search
+                    // box just gains a line break and never searches (spec §11.5).
+                    val action = (currentInputEditorInfo?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION
+                    if (action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
+                        ic.performEditorAction(action)
+                    } else {
+                        ic.sendKeyEvent(
+                            android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_ENTER)
+                        )
+                        ic.sendKeyEvent(
+                            android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_ENTER)
+                        )
+                    }
                 }
+                // Shift and layer switching are handled inside KeyGridView, which owns that
+                // state — nothing to do here, but the branches must exist for exhaustiveness.
+                KeyGridView.KeyAction.Shift,
+                KeyGridView.KeyAction.SymbolLayer -> Unit
                 KeyGridView.KeyAction.SwitchLanguage -> switchLanguage()
                 KeyGridView.KeyAction.Clipboard -> {
                     // Re-read the system clipboard on every open, not just when the field is
@@ -225,6 +240,43 @@ class WearKeyImeService : InputMethodService() {
         grid.layout = when (grid.layout) {
             KeyGridView.Layout.EN_US -> KeyGridView.Layout.RU_RU
             KeyGridView.Layout.RU_RU -> KeyGridView.Layout.EN_US
+        }
+    }
+
+    /**
+     * Spec §11.5 input-type awareness. Picks a sensible starting layer for the field, and sets
+     * the action key's label from `imeOptions` (Go / Search / Send / Next / Done), so the enter
+     * key says what it will actually do.
+     */
+    private fun applyInputTypeAwareness(info: EditorInfo?) {
+        val grid = surfaceView?.keyGrid ?: return
+        val inputType = info?.inputType ?: 0
+        val cls = inputType and InputType.TYPE_MASK_CLASS
+        val variation = inputType and InputType.TYPE_MASK_VARIATION
+
+        // Number, phone and datetime fields open straight on the symbol layer, where the digits
+        // live — opening on QWERTY would mean an extra tap on every single such field.
+        val wantsDigits = cls == InputType.TYPE_CLASS_NUMBER ||
+            cls == InputType.TYPE_CLASS_PHONE ||
+            cls == InputType.TYPE_CLASS_DATETIME
+        grid.symbolLayerVisible = wantsDigits
+        grid.shiftState = KeyGridView.ShiftState.OFF
+
+        // Email and URI fields keep letters, but '@' '.' '/' matter enough there to be worth
+        // surfacing later — noted rather than silently forgotten.
+        val isEmailOrUri = cls == InputType.TYPE_CLASS_TEXT &&
+            (variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
+                variation == InputType.TYPE_TEXT_VARIATION_URI)
+        grid.emailOrUriHints = isEmailOrUri
+
+        grid.actionLabel = when ((info?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION) {
+            EditorInfo.IME_ACTION_GO -> getString(R.string.action_go)
+            EditorInfo.IME_ACTION_SEARCH -> getString(R.string.action_search)
+            EditorInfo.IME_ACTION_SEND -> getString(R.string.action_send)
+            EditorInfo.IME_ACTION_NEXT -> getString(R.string.action_next)
+            EditorInfo.IME_ACTION_DONE -> getString(R.string.action_done)
+            else -> null
         }
     }
 

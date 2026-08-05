@@ -4,4 +4,9 @@
     <string name="ime_label">WearKey</string>
     <string name="subtype_en_us">Английский (США)</string>
     <string name="subtype_ru_ru">Русский</string>
+    <string name="action_go">Перейти</string>
+    <string name="action_search">Найти</string>
+    <string name="action_send">Отпр.</string>
+    <string name="action_next">Далее</string>
+    <string name="action_done">Готово</string>
 </resources>

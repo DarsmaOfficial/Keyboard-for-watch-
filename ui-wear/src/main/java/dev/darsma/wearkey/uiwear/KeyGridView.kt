@@ -37,6 +37,10 @@ class KeyGridView @JvmOverloads constructor(
         object SwitchLanguage : KeyAction()
         /** Opens the clipboard history panel (spec §6). */
         object Clipboard : KeyAction()
+        /** Cycles OFF -> SHIFTED -> CAPS_LOCK -> OFF. */
+        object Shift : KeyAction()
+        /** Toggles between the letter layer and the symbol/number layer. */
+        object SymbolLayer : KeyAction()
     }
 
     fun interface OnKeyListener {
@@ -66,6 +70,74 @@ class KeyGridView @JvmOverloads constructor(
         "ЯЧСМИТЬБЮ"
     )
 
+    /**
+     * Symbol/number layer (spec §11 MVP item 5). Two pages, because a watch row cannot hold the
+     * punctuation people actually need without the keys becoming untappable.
+     */
+    private val symbolPage1 = listOf(
+        "1234567890",
+        "-/:;()€&@",
+        ".,?!'\""
+    )
+    private val symbolPage2 = listOf(
+        "[]{}#%^*+=",
+        "_\\|~<>$£¥",
+        "•°·§…"
+    )
+
+    /** Shift state, cycled by the shift key (spec §11 MVP item 5). */
+    enum class ShiftState { OFF, SHIFTED, CAPS_LOCK }
+
+    var shiftState: ShiftState = ShiftState.OFF
+        set(value) {
+            if (field == value) return
+            field = value
+            computeLayout()
+            invalidate()
+        }
+
+    /** True while the symbol/number layer is shown instead of letters. */
+    var symbolLayerVisible: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            symbolPage = 0
+            computeLayout()
+            invalidate()
+        }
+
+    /** Which page of the symbol layer is shown (0 or 1). */
+    var symbolPage: Int = 0
+        set(value) {
+            val v = value.coerceIn(0, 1)
+            if (field == v) return
+            field = v
+            computeLayout()
+            invalidate()
+        }
+
+    /**
+     * Label for the action key, taken from the field's `imeOptions` (Go / Search / Send / Next /
+     * Done). Null means a plain newline symbol. Spec §11.5: the action key should say what it
+     * will actually do.
+     */
+    var actionLabel: String? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            computeLayout()
+            invalidate()
+        }
+
+    /** True for email/URI fields, where '@' '.' and '/' deserve to be reachable. */
+    var emailOrUriHints: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            computeLayout()
+            invalidate()
+        }
+
     var layout: Layout = Layout.EN_US
         set(value) {
             if (field == value) return
@@ -75,15 +147,27 @@ class KeyGridView @JvmOverloads constructor(
         }
 
     private val letterRows: List<String>
-        get() = when (layout) {
-            Layout.EN_US -> enRows
-            Layout.RU_RU -> ruRows
+        get() = when {
+            symbolLayerVisible -> if (symbolPage == 0) symbolPage1 else symbolPage2
+            layout == Layout.RU_RU -> ruRows
+            // Email/URI fields get '@' and '.' appended to the bottom letter row, so the two
+            // characters those fields always need are one tap away instead of behind the
+            // symbol layer (spec §11.5).
+            emailOrUriHints -> enRows.mapIndexed { i, row -> if (i == 2) row + "@." else row }
+            else -> enRows
         }
+
+    /** Applies the current shift state to a character from the letter layer. */
+    private fun applyShift(c: Char): Char =
+        if (symbolLayerVisible || shiftState == ShiftState.OFF) c.lowercaseChar() else c
 
     private data class Key(val action: KeyAction, val label: String, val rect: RectF)
 
     private val keys = mutableListOf<Key>()
     private var pressedKey: Key? = null
+
+    /** Amplitude-only haptics per spec §8.1. Exposed so settings can adjust intensity later. */
+    val haptics = HapticFeedback(context)
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#1C1C1E")
@@ -92,6 +176,18 @@ class KeyGridView @JvmOverloads constructor(
 
     private val keyPressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#3A3A3C")
+        style = Paint.Style.FILL
+    }
+
+    /** One-shot shift: a lifted, still-dark key. */
+    private val keyActivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#4A4A4E")
+        style = Paint.Style.FILL
+    }
+
+    /** Caps lock: filled with the accent colour, so it is unmistakable at a glance. */
+    private val keyAccentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#00E5FF")
         style = Paint.Style.FILL
     }
 
@@ -219,7 +315,8 @@ class KeyGridView @JvmOverloads constructor(
             val usableWidth = (rowRight - rowLeft).coerceAtLeast(1f)
             val keyWidth = usableWidth / row.length
 
-            for ((colIndex, char) in row.withIndex()) {
+            for ((colIndex, rawChar) in row.withIndex()) {
+                val char = applyShift(rawChar)
                 val left = rowLeft + colIndex * keyWidth
                 val right = left + keyWidth
                 keys.add(
@@ -247,35 +344,58 @@ class KeyGridView @JvmOverloads constructor(
         val funcRight = (circleCenterX + funcHalfChord).coerceAtMost(width.toFloat()) - KEY_EDGE_INSET_PX
         val funcWidth = (funcRight - funcLeft).coerceAtLeast(1f)
 
-        val backspaceWidth = funcWidth * 0.19f
-        val switchLangWidth = funcWidth * 0.16f
-        val clipboardWidth = funcWidth * 0.16f
-        val enterWidth = funcWidth * 0.19f
-        val spaceWidth = funcWidth - backspaceWidth - switchLangWidth - clipboardWidth - enterWidth
+        // Leading key is shift on the letter layer, and the symbol-page switch on the symbol
+        // layer — the same slot, since shift has no meaning among symbols.
+        val leadingAction = if (symbolLayerVisible) KeyAction.Shift else KeyAction.Shift
+        val leadingLabel = when {
+            symbolLayerVisible -> if (symbolPage == 0) "2/2" else "1/2"
+            shiftState == ShiftState.CAPS_LOCK -> "⇪"
+            shiftState == ShiftState.SHIFTED -> "⇧"
+            else -> "⇧"
+        }
+
+        val shiftWidth = funcWidth * 0.155f
+        val symbolWidth = funcWidth * 0.155f
+        val backspaceWidth = funcWidth * 0.155f
+        val clipboardWidth = funcWidth * 0.13f
+        val switchLangWidth = funcWidth * 0.14f
+        val enterWidth = funcWidth * 0.155f
+        val spaceWidth = funcWidth - shiftWidth - symbolWidth - backspaceWidth -
+            clipboardWidth - switchLangWidth - enterWidth
 
         var x = funcLeft
         keys.add(
-            Key(KeyAction.Backspace, "⌫",
-                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + backspaceWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
+            Key(leadingAction, leadingLabel,
+                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + shiftWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
-        x += backspaceWidth
+        x += shiftWidth
+        keys.add(
+            Key(KeyAction.SymbolLayer, if (symbolLayerVisible) "ABC" else "?123",
+                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + symbolWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
+        )
+        x += symbolWidth
         keys.add(
             Key(KeyAction.SwitchLanguage, switchLanguageLabel(),
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + switchLangWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
         x += switchLangWidth
         keys.add(
-            Key(KeyAction.Clipboard, "▤",
-                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + clipboardWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
-        )
-        x += clipboardWidth
-        keys.add(
             Key(KeyAction.Space, "␣",
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + spaceWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
         x += spaceWidth
         keys.add(
-            Key(KeyAction.Enter, "⏎",
+            Key(KeyAction.Clipboard, "▤",
+                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + clipboardWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
+        )
+        x += clipboardWidth
+        keys.add(
+            Key(KeyAction.Backspace, "⌫",
+                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + backspaceWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
+        )
+        x += backspaceWidth
+        keys.add(
+            Key(KeyAction.Enter, actionLabel ?: "⏎",
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, funcRight - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
     }
@@ -295,16 +415,47 @@ class KeyGridView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
 
         for (key in keys) {
-            val paint = if (key === pressedKey) keyPressedPaint else keyPaint
+            // Shift shows its state through the key's own fill, so the user can tell one-shot
+            // from caps lock without hunting for a separate indicator.
+            val shiftActive = key.action === KeyAction.Shift &&
+                !symbolLayerVisible && shiftState != ShiftState.OFF
+            val paint = when {
+                key === pressedKey -> keyPressedPaint
+                shiftActive && shiftState == ShiftState.CAPS_LOCK -> keyAccentPaint
+                shiftActive -> keyActivePaint
+                else -> keyPaint
+            }
             val radius = minOf(key.rect.width(), key.rect.height()) * 0.28f
             canvas.drawRoundRect(key.rect, radius, radius, paint)
             canvas.drawRoundRect(key.rect, radius, radius, keyBorderPaint)
+
+            val labelColor = if (shiftActive && shiftState == ShiftState.CAPS_LOCK) {
+                Color.BLACK
+            } else {
+                Color.WHITE
+            }
+            labelPaint.color = labelColor
+
+            // Word labels ("Найти", "?123") need to shrink to fit; single glyphs do not.
+            val baseSize = labelPaint.textSize
+            if (key.label.length > 1) {
+                val maxWidth = key.rect.width() - 6f
+                var size = baseSize * 0.62f
+                labelPaint.textSize = size
+                while (labelPaint.measureText(key.label) > maxWidth && size > 6f) {
+                    size -= 1f
+                    labelPaint.textSize = size
+                }
+            }
+
             canvas.drawText(
                 key.label,
                 key.rect.centerX(),
                 key.rect.centerY() - (labelPaint.ascent() + labelPaint.descent()) / 2,
                 labelPaint
             )
+            labelPaint.textSize = baseSize
+            labelPaint.color = Color.WHITE
         }
     }
 
@@ -328,6 +479,41 @@ class KeyGridView @JvmOverloads constructor(
                 pressedKey = null
                 invalidate()
                 if (released != null) {
+                    // Haptics fire on release, matching where the action actually happens
+                    // (spec §8.1 amplitude map).
+                    haptics.perform(
+                        when (released.action) {
+                            KeyAction.Backspace -> HapticFeedback.Feedback.BACKSPACE
+                            KeyAction.Enter -> HapticFeedback.Feedback.ENTER
+                            KeyAction.Space,
+                            KeyAction.Shift,
+                            KeyAction.SymbolLayer,
+                            KeyAction.SwitchLanguage,
+                            KeyAction.Clipboard -> HapticFeedback.Feedback.SPACE_OR_LAYER
+                            is KeyAction.Character -> HapticFeedback.Feedback.KEY_TAP
+                        }
+                    )
+                    // Layer/shift state is owned by this view, so handle those here and let the
+                    // host only deal with actions that produce text or need an InputConnection.
+                    when (released.action) {
+                        KeyAction.Shift -> {
+                            if (symbolLayerVisible) {
+                                symbolPage = if (symbolPage == 0) 1 else 0
+                            } else {
+                                shiftState = when (shiftState) {
+                                    ShiftState.OFF -> ShiftState.SHIFTED
+                                    ShiftState.SHIFTED -> ShiftState.CAPS_LOCK
+                                    ShiftState.CAPS_LOCK -> ShiftState.OFF
+                                }
+                            }
+                        }
+                        KeyAction.SymbolLayer -> symbolLayerVisible = !symbolLayerVisible
+                        is KeyAction.Character -> {
+                            // One-shot shift releases after a single character, caps lock does not.
+                            if (shiftState == ShiftState.SHIFTED) shiftState = ShiftState.OFF
+                        }
+                        else -> Unit
+                    }
                     onKeyListener?.onKey(released.action)
                     return true
                 }
