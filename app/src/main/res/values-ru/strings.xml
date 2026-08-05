@@ -9,4 +9,14 @@
     <string name="action_send">Отпр.</string>
     <string name="action_next">Далее</string>
     <string name="action_done">Готово</string>
+    <string name="settings_title">WearKey</string>
+    <string name="settings_haptics">Вибрация</string>
+    <string name="settings_haptics_off">Выкл.</string>
+    <string name="settings_haptics_low">Слабая</string>
+    <string name="settings_haptics_medium">Средняя</string>
+    <string name="settings_haptics_high">Сильная</string>
+    <string name="settings_clear_data">Удалить все данные</string>
+    <string name="settings_cleared">Удалено</string>
+    <string name="settings_licenses">Лицензии</string>
+    <string name="settings_privacy_note">Нет доступа к сети. Нет микрофона. Ничего не покидает часы.</string>
 </resources>

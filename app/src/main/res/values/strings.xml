@@ -9,4 +9,14 @@
     <string name="action_send">Send</string>
     <string name="action_next">Next</string>
     <string name="action_done">Done</string>
+    <string name="settings_title">WearKey</string>
+    <string name="settings_haptics">Vibration</string>
+    <string name="settings_haptics_off">Off</string>
+    <string name="settings_haptics_low">Low</string>
+    <string name="settings_haptics_medium">Medium</string>
+    <string name="settings_haptics_high">High</string>
+    <string name="settings_clear_data">Clear all saved data</string>
+    <string name="settings_cleared">Cleared</string>
+    <string name="settings_licenses">Open source licences</string>
+    <string name="settings_privacy_note">No network access. No microphone. Nothing leaves this watch.</string>
 </resources>

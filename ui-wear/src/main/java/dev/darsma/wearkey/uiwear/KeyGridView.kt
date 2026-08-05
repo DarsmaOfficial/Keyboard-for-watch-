@@ -492,6 +492,7 @@ class KeyGridView @JvmOverloads constructor(
                 pressedKey = null
                 invalidate()
                 if (released != null) {
+                    announceForKey(released)
                     // Haptics fire on release, matching where the action actually happens
                     // (spec §8.1 amplitude map).
                     haptics.perform(
@@ -568,6 +569,43 @@ class KeyGridView @JvmOverloads constructor(
             }
         }
         return best
+    }
+
+    /**
+     * Spoken description for a key (spec §11.5 accessibility). Symbols get words rather than
+     * the raw glyph, because TalkBack reads "⌫" as nothing useful.
+     */
+    private fun describeKey(key: Key): CharSequence = when (val a = key.action) {
+        is KeyAction.Character -> a.char.toString()
+        KeyAction.Space -> context.getString(R.string.a11y_space)
+        KeyAction.Backspace -> context.getString(R.string.a11y_backspace)
+        KeyAction.Enter -> actionLabel ?: context.getString(R.string.a11y_enter)
+        KeyAction.SwitchLanguage -> context.getString(R.string.a11y_switch_language)
+        KeyAction.Clipboard -> context.getString(R.string.a11y_clipboard)
+        KeyAction.SymbolLayer ->
+            if (symbolLayerVisible) context.getString(R.string.a11y_letters)
+            else context.getString(R.string.a11y_symbols)
+        KeyAction.Shift -> when {
+            symbolLayerVisible -> context.getString(R.string.a11y_more_symbols)
+            shiftState == ShiftState.CAPS_LOCK -> context.getString(R.string.a11y_caps_lock)
+            shiftState == ShiftState.SHIFTED -> context.getString(R.string.a11y_shift_on)
+            else -> context.getString(R.string.a11y_shift)
+        }
+    }
+
+    /**
+     * Announces what just happened, so screen-reader users get confirmation of a committed
+     * character or a layer change rather than silence (spec §11.5: "announce state changes,
+     * not just key labels").
+     */
+    private fun announceForKey(key: Key) {
+        if (!isAccessibilityActive()) return
+        announceForAccessibility(describeKey(key))
+    }
+
+    private fun isAccessibilityActive(): Boolean {
+        val am = context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
+        return am?.isEnabled == true && am.isTouchExplorationEnabled
     }
 
     override fun onDetachedFromWindow() {

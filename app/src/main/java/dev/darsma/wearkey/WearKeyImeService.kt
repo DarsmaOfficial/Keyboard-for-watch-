@@ -27,6 +27,15 @@ class WearKeyImeService : InputMethodService() {
     private var surfaceView: KeyboardSurfaceView? = null
     private val editorState = EditorState()
     private val clipboardStore = ClipboardStore()
+    private val clipboardPersistence by lazy { EncryptedClipboardPersistence(this) }
+
+    override fun onCreate() {
+        super.onCreate()
+        // Restore encrypted history once, up front (spec §6: history survives process death).
+        clipboardPersistence.load(clipboardStore)
+        // Persist on every change so a kill by memory pressure never loses entries.
+        clipboardStore.addListener(ClipboardStore.Listener { clipboardPersistence.save(clipboardStore) })
+    }
 
     override fun onCreateInputView(): View {
         val view = KeyboardSurfaceView(this)
@@ -94,6 +103,10 @@ class WearKeyImeService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+
+        // Apply the saved haptic intensity every time the keyboard is shown, so a change in
+        // settings takes effect on the next field without needing a restart.
+        surfaceView?.keyGrid?.haptics?.intensity = SettingsStore(this).hapticIntensity
 
         // Spec §11.5: never carry text between fields — full reset on every new editor, even
         // if the previous field was never explicitly finished (rapid field-switching case).

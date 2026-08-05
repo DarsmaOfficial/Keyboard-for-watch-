@@ -15,7 +15,10 @@
   android:settingsActivity intentionally omitted until Phase 5 ships SettingsActivity —
   pointing this at a nonexistent class would make "Language and input" settings crash.
 -->
+<!-- settingsActivity now points at the real SettingsActivity, which also hosts the mandatory
+     offline "Open source licenses" screen (spec §3.2). -->
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="dev.darsma.wearkey.SettingsActivity"
     android:supportsSwitchingToNextInputMethod="true">
     <subtype
         android:subtypeId="0x01"

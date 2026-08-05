@@ -4,4 +4,17 @@
     <string name="clipboard_empty">Clipboard is empty</string>
     <string name="clipboard_clear_all">Clear all</string>
     <string name="clipboard_expires">expires soon</string>
+
+    <!-- Spoken labels for TalkBack (spec §11.5) -->
+    <string name="a11y_space">Space</string>
+    <string name="a11y_backspace">Delete</string>
+    <string name="a11y_enter">Enter</string>
+    <string name="a11y_switch_language">Switch language</string>
+    <string name="a11y_clipboard">Clipboard history</string>
+    <string name="a11y_symbols">Symbols and numbers</string>
+    <string name="a11y_letters">Letters</string>
+    <string name="a11y_more_symbols">More symbols</string>
+    <string name="a11y_shift">Shift</string>
+    <string name="a11y_shift_on">Shift on</string>
+    <string name="a11y_caps_lock">Caps lock on</string>
 </resources>

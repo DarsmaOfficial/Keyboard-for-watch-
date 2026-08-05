@@ -57,5 +57,27 @@
             </intent-filter>
         </activity>
 
+        <!--
+          Settings + the mandatory offline "Open source licenses" screen (spec §3.2). The IME
+          declares SettingsActivity in method.xml so the system's "Language and input" entry
+          reaches it too.
+        -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:label="@string/settings_title"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".LicensesActivity"
+            android:exported="false"
+            android:label="@string/settings_licenses"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
     </application>
 </manifest>
