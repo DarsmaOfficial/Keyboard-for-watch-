@@ -152,7 +152,7 @@ class TouchModelTest {
         val right = row[4]
         // Just inside the right key, so spatially `right` is (marginally) preferred.
         val x = (left.centerX + right.centerX) / 2f + 1f
-        assertEquals(right.id, model.bestMatch(x, 160f, row))
+        assertEquals(right.id, model.bestMatch(x, 160f, row)?.id)
 
         // With a strong prior favouring the left key, the decision flips. This is the seam
         // §7.2b spatial prediction will use to fold in dictionary likelihood.
