@@ -91,16 +91,45 @@ class TouchModelTest {
         assertEquals(space.id, hit?.id, "a tap inside the spacebar must not be stolen by a narrow neighbour")
     }
 
+    /**
+     * Vertical spread is deliberately tighter than horizontal, so an equal-sized miss costs more
+     * vertically than horizontally. The intent is that sloppy taps slide *within* a row rather
+     * than jumping to the row above or below, because a row jump yields a letter from a visually
+     * distant key and is the most confusing error a keyboard can make.
+     *
+     * Asserted directly on the scoring function. An earlier version of this test tried to prove it
+     * through a three-key layout and failed for a reason worth recording: the probe point sat
+     * exactly midway between two rows, and near the bottom of a round display the outward radial
+     * correction points almost straight down, so it legitimately tipped into the lower row. The
+     * layout answered a different question than the one being asked.
+     */
     @Test
-    fun `vertical spread is tighter than horizontal so rows do not swap`() {
+    fun `an equal miss costs more vertically than horizontally`() {
+        val key = KeyTarget(id = 0, centerX = 233f, centerY = 160f, width = 38f, height = 44f)
+        val offset = 18f
+
+        val horizontal = model.logLikelihood(key.centerX + offset, key.centerY, key)
+        val vertical = model.logLikelihood(key.centerX, key.centerY + offset, key)
+
+        assertTrue(
+            vertical < horizontal,
+            "a $offset px vertical miss ($vertical) should score worse than the same miss " +
+                "horizontally ($horizontal)"
+        )
+    }
+
+    /**
+     * The layout-level consequence of the anisotropy above, probed where it is unambiguous:
+     * closer to the horizontal neighbour than to the key below, the neighbour must win.
+     */
+    @Test
+    fun `a sloppy tap slides within its row rather than jumping rows`() {
         val upper = KeyTarget(id = 0, centerX = 233f, centerY = 120f, width = 38f, height = 44f)
         val lower = KeyTarget(id = 1, centerX = 233f, centerY = 164f, width = 38f, height = 44f)
         val neighbour = KeyTarget(id = 2, centerX = 274f, centerY = 120f, width = 38f, height = 44f)
         val keys = listOf(upper, lower, neighbour)
 
-        // A tap displaced equally right and down from `upper`: the horizontal neighbour should win,
-        // because sliding within a row is a far less confusing error than jumping rows.
-        val hit = model.bestMatch(upper.centerX + 22f, upper.centerY + 22f, keys)
+        val hit = model.bestMatch(upper.centerX + 26f, upper.centerY + 10f, keys)
         assertEquals(neighbour.id, hit?.id)
     }
 
