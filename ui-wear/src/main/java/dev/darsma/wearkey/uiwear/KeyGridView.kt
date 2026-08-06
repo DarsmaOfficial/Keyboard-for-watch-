@@ -9,6 +9,9 @@ import android.util.AttributeSet
 import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.View
+import dev.darsma.wearkey.imecore.touch.KeyTarget
+import dev.darsma.wearkey.imecore.touch.RoundDisplay
+import dev.darsma.wearkey.imecore.touch.TouchModel
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -19,9 +22,13 @@ import kotlin.math.sqrt
  * Phase 1 adds: actual key press handling (tap → character/action callback) and a functional
  * row of space/backspace/enter so a full type-and-see-it-composed loop works end to end.
  *
- * Deliberately NOT the final key grid — no circular hit-zone extension / bivariate Gaussian
- * touch model yet (spec §7.1, Phase 2), no press animation / spring physics yet (spec §8.0,
- * Phase 3). Geometry here is a plain rectangular grid, replaced in Phase 2.
+ * Phase 2 replaces rectangular hit-testing with the bivariate Gaussian touch model in
+ * `:ime-core` (spec §7.1). Keys are still *drawn* as rounded rectangles clipped to the display
+ * chord — that is what users can read — but which key a touch *selects* is now decided
+ * probabilistically from key centroids, so taps in inter-key gaps and on the glass curve beyond
+ * the outermost key resolve sensibly instead of being swallowed.
+ *
+ * Phase 3 (spring press physics) is already wired via androidx.dynamicanimation.
  */
 class KeyGridView @JvmOverloads constructor(
     context: Context,
@@ -164,6 +171,15 @@ class KeyGridView @JvmOverloads constructor(
     private data class Key(val action: KeyAction, val label: String, val rect: RectF)
 
     private val keys = mutableListOf<Key>()
+
+    /**
+     * Probabilistic touch model (spec §7.1), rebuilt whenever the display geometry changes.
+     * Null only before the first layout pass, where [keyAt] falls back to plain containment.
+     */
+    private var touchModel: TouchModel? = null
+
+    /** Touch targets mirroring [keys] by index. Rebuilt per layout, never per touch event. */
+    private var touchTargets: List<KeyTarget> = emptyList()
     private var pressedKey: Key? = null
 
     /** Amplitude-only haptics per spec §8.1. Exposed so settings can adjust intensity later. */
@@ -363,6 +379,11 @@ class KeyGridView @JvmOverloads constructor(
         // a dead strip on one edge and shoving the opposite column under the bezel.
         val circleCenterX = width / 2f
 
+        // Hand the same geometry to the touch model (spec §7.1). Note circleCenterYInView is
+        // normally negative — the circle's centre sits above this view's origin — and the sign
+        // matters: inverting it would make the radial drift correction pull inward.
+        touchModel = TouchModel(RoundDisplay(circleCenterX, circleCenterYInView, radius))
+
         for ((rowIndex, row) in letterRows.withIndex()) {
             val top = gridTop + rowIndex * rowHeight
             val bottom = top + rowHeight
@@ -467,6 +488,11 @@ class KeyGridView @JvmOverloads constructor(
             Key(KeyAction.Enter, actionLabel ?: "⏎",
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, funcRight - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
+
+        // Selection targets must be regenerated whenever the drawn geometry changes — a stale
+        // target list would silently map taps to the previous layout's keys after a language or
+        // layer switch.
+        rebuildTouchTargets()
     }
 
     /** Half-width of the horizontal chord of a circle of [radius] at vertical offset [dy]. */
@@ -615,32 +641,41 @@ class KeyGridView @JvmOverloads constructor(
     }
 
     /**
-     * Hit-testing is deliberately more forgiving than the drawn rect: a tap that lands in the
-     * gap between keys, or just outside the row's chord near the bezel, resolves to the nearest
-     * key centre instead of being swallowed. This is the cheap half of spec §7.1's
-     * "extend outer-key hit regions to the physical display edge" — the full bivariate Gaussian
-     * touch model lands in Phase 2 proper.
+     * Resolves a touch to a key using the bivariate Gaussian model (spec §7.1).
+     *
+     * What a key *looks* like and what it *selects* are now deliberately different things. Keys
+     * are drawn as rounded rects clipped to the display chord because that is legible; selection
+     * scores every key by Mahalanobis distance from its centroid, so:
+     *
+     * - a tap in the gap between two keys goes to the nearer one instead of nowhere;
+     * - a tap past the outermost key of a row — on the curved glass where nothing is drawn —
+     *   still reaches that key, which is §7.1's "extend outer-key hit regions to the physical
+     *   display edge" without needing separately maintained extended rectangles;
+     * - the reported point is first pushed outward along the radius to compensate for fat-finger
+     *   drift toward the screen centre, an effect that grows sharply near the bezel.
+     *
+     * [targets] is rebuilt only when the layout changes, not per touch event, so the drag hot
+     * path allocates nothing.
      */
     private fun keyAt(x: Float, y: Float): Key? {
-        keys.firstOrNull { it.rect.contains(x, y) }?.let { return it }
+        val model = touchModel ?: return keys.firstOrNull { it.rect.contains(x, y) }
+        val match = model.bestMatch(x, y, touchTargets) ?: return null
+        return keys.getOrNull(match.id)
+    }
 
-        var best: Key? = null
-        var bestDistSq = Float.MAX_VALUE
-        for (key in keys) {
-            val cx = key.rect.centerX()
-            val cy = key.rect.centerY()
-            // Only consider keys on roughly the same row, so a sloppy horizontal tap never
-            // jumps a row vertically.
-            if (abs(cy - y) > key.rect.height()) continue
-            val dx = cx - x
-            val dy = cy - y
-            val distSq = dx * dx + dy * dy
-            if (distSq < bestDistSq) {
-                bestDistSq = distSq
-                best = key
-            }
+    /** Rebuilds the touch-model targets from the drawn key rects. Called once per layout pass. */
+    private fun rebuildTouchTargets() {
+        touchTargets = keys.mapIndexed { index, key ->
+            KeyTarget(
+                id = index,
+                centerX = key.rect.centerX(),
+                centerY = key.rect.centerY(),
+                // Use the pre-gap key size so the model's spread reflects the real target the
+                // user perceives, not the slightly smaller rect left after cosmetic gaps.
+                width = key.rect.width() + 2f * KEY_GAP_PX,
+                height = key.rect.height() + 2f * KEY_GAP_PX
+            )
         }
-        return best
     }
 
     /**
