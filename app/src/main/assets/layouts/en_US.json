@@ -1,0 +1,11 @@
+{
+  "id": "en_US",
+  "languageTag": "en-US",
+  "displayName": "English",
+  "rightToLeft": false,
+  "letterRows": ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"],
+  "symbolPages": [
+    ["1234567890", "-/:;()€&@", ".,?!'\""],
+    ["[]{}#%^*+=", "_\\|~<>$£¥", "•°·§…"]
+  ]
+}

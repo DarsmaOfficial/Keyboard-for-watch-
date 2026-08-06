@@ -19,4 +19,5 @@ rootProject.name = "wear-keyboard"
 include(":app")
 include(":ui-wear")
 include(":ime-core")
+include(":layout-engine")
 include(":dict")

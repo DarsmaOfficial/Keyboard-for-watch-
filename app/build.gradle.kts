@@ -68,6 +68,7 @@ android {
 dependencies {
     implementation(project(":ui-wear"))
     implementation(project(":ime-core"))
+    implementation(project(":layout-engine"))
     implementation(project(":dict"))
     // Intentionally minimal for Phase 0: no Compose, no NDK, no INTERNET-requiring libs.
     // androidx.dynamicanimation is added in Phase 3 (motion) — not needed to draw a static grid.

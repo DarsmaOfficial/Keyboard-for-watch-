@@ -141,6 +141,15 @@ class WearKeyImeService : InputMethodService() {
         }
         view.suggestionStrip.onSuggestionListener =
             SuggestionStripView.OnSuggestionListener { word -> replaceCurrentWord(word) }
+
+        // Spec §4.1/§9: layouts are data. Each file that parses replaces the compiled-in rows for
+        // its language; each that does not simply leaves them in place, so a corrupt asset can
+        // never leave the user without a keyboard (spec §11.5).
+        val layoutLoader = LayoutLoader(this)
+        listOf("en_US", "ru_RU").forEach { id ->
+            layoutLoader.load(id)?.let { view.keyGrid.applyLayout(it) }
+        }
+
         surfaceView = view
         return view
     }

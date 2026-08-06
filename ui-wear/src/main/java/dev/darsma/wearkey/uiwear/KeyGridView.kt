@@ -66,27 +66,49 @@ class KeyGridView @JvmOverloads constructor(
     // Letter rows approximate QWERTY/ЙЦУКЕН — geometry replaced in Phase 2 with round-optimised
     // layout (spec §7.1). Row *shapes* differ between locales (Russian has an extra row char);
     // that's fine here, real geometry work happens in Phase 2 regardless of language.
-    private val enRows = listOf(
+    private var enRows = listOf(
         "QWERTYUIOP",
         "ASDFGHJKL",
         "ZXCVBNM"
     )
-    private val ruRows = listOf(
+    private var ruRows = listOf(
         "ЙЦУКЕНГШЩЗ",
         "ФЫВАПРОЛДЖ",
         "ЯЧСМИТЬБЮ"
     )
 
     /**
+     * Replaces a layer's rows from a parsed layout file (spec §4.1, §9).
+     *
+     * The values above remain as compiled-in fallbacks rather than being deleted. Spec §11.5 is
+     * explicit that a keyboard which cannot draw itself is the worst possible failure in this
+     * product category — the user is left with no way to type at all, including no way to type a
+     * bug report. So a missing or corrupt layout asset degrades to the built-in rows instead of
+     * producing an empty grid.
+     */
+    fun applyLayout(layout: dev.darsma.wearkey.layout.KeyboardLayout) {
+        when (layout.languageTag.lowercase()) {
+            "ru-ru", "ru" -> ruRows = layout.letterRows
+            else -> enRows = layout.letterRows
+        }
+        if (layout.symbolPages.size >= 2) {
+            symbolPage1 = layout.symbolPages[0]
+            symbolPage2 = layout.symbolPages[1]
+        }
+        computeLayout()
+        invalidate()
+    }
+
+    /**
      * Symbol/number layer (spec §11 MVP item 5). Two pages, because a watch row cannot hold the
      * punctuation people actually need without the keys becoming untappable.
      */
-    private val symbolPage1 = listOf(
+    private var symbolPage1 = listOf(
         "1234567890",
         "-/:;()€&@",
         ".,?!'\""
     )
-    private val symbolPage2 = listOf(
+    private var symbolPage2 = listOf(
         "[]{}#%^*+=",
         "_\\|~<>$£¥",
         "•°·§…"

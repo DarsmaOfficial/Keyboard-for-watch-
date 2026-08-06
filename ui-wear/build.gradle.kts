@@ -23,6 +23,8 @@ android {
 
 dependencies {
     implementation(project(":ime-core"))
+    // Spec §9: layouts are declarative data, parsed here rather than hardcoded in the view.
+    implementation(project(":layout-engine"))
     // Spec §8.0: real spring physics, not tween approximations. 31 KB, Apache-2.0, and
     // explicitly NOT androidx.compose — the CI gate still passes.
     implementation("androidx.dynamicanimation:dynamicanimation:1.0.0")
