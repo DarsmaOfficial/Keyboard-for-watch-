@@ -1,7 +1,6 @@
 package dev.darsma.wearkey
 
 import android.content.Context
-import android.util.Log
 import dev.darsma.wearkey.layout.KeyboardLayout
 import dev.darsma.wearkey.layout.LayoutParser
 
@@ -24,16 +23,23 @@ import dev.darsma.wearkey.layout.LayoutParser
  */
 class LayoutLoader(private val context: Context) {
 
-    /** Returns the parsed layout for [id], or null if it is absent or malformed. */
+    /**
+     * Returns the parsed layout for [id], or null if it is absent or malformed.
+     *
+     * Deliberately silent. The first version logged a warning here and CI rejected it — the build
+     * fails on any logging call in keyboard source, because a keyboard must never log anything
+     * near what the user types. That gate is worth more than this diagnostic: the rule only holds
+     * if it has no exceptions, and "just this once, it isn't sensitive" is how such rules erode.
+     *
+     * The failure is not silent to the *user*, which is what matters — the keyboard visibly keeps
+     * its built-in rows. Anyone editing a layout file can validate it against the parser's unit
+     * tests, off-device, where logging is free.
+     */
     fun load(id: String): KeyboardLayout? = runCatching {
         val json = context.assets.open("$LAYOUT_DIR/$id.json").use { stream ->
             stream.readBytes().toString(Charsets.UTF_8)
         }
         LayoutParser.parse(json)
-    }.onFailure { error ->
-        // Log the failure but never the file contents: a layout is not sensitive, but keeping a
-        // strict "never log input-adjacent data" habit is what stops the security rule eroding.
-        Log.w(TAG, "layout '$id' unavailable (${error.javaClass.simpleName}); using built-in rows")
     }.getOrNull()
 
     /** Lists the layout ids shipped in assets. Empty when the directory is missing. */
@@ -47,6 +53,5 @@ class LayoutLoader(private val context: Context) {
 
     private companion object {
         const val LAYOUT_DIR = "layouts"
-        const val TAG = "WearKeyLayout"
     }
 }
