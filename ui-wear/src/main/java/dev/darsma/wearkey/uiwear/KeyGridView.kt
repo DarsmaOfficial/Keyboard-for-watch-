@@ -870,8 +870,19 @@ class KeyGridView @JvmOverloads constructor(
         // Declaring the view important is what makes the framework ask for the provider, at which
         // point the virtual key nodes and hover routing start working.
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
-        isFocusable = true
-        contentDescription = context.getString(R.string.a11y_keyboard)
+
+        // Deliberately NO contentDescription on the host, and deliberately not focusable.
+        //
+        // Both are tempting and both break the virtual tree. A view carrying a contentDescription
+        // is treated by the framework as a labelled *leaf*: it announces that label and stops
+        // descending, so the per-key children are never queried. Making the host itself focusable
+        // has the same effect for exploration — focus lands on the whole grid instead of on the
+        // key under the finger. The framework reported exactly this: the IME window was present and
+        // correctly sized but showed `hasChildren=false`.
+        //
+        // The host must therefore stay an unlabelled container whose only job is to hand out
+        // virtual nodes; every announcement comes from a key node instead.
+        isFocusable = false
     }
 
     override fun getAccessibilityNodeProvider(): android.view.accessibility.AccessibilityNodeProvider =
