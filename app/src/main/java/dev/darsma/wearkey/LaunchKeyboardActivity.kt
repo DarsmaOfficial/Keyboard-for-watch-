@@ -80,12 +80,10 @@ class LaunchKeyboardActivity : Activity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        surfaceView?.startFrameTiming()
-    }
-
     override fun onPause() {
+        // Frame timing is started explicitly from the frame-stats screen rather than on every
+        // resume: auto-starting reset the sample buffer each time this Activity appeared, so a
+        // measurement could never span a real session.
         surfaceView?.stopFrameTiming()
         super.onPause()
     }

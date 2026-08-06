@@ -238,11 +238,16 @@ class WearKeyImeService : InputMethodService() {
         // Never leave the clipboard panel open across fields.
         surfaceView?.hideClipboard()
 
-        surfaceView?.startFrameTiming()
+        // Frame timing is NOT started here. It used to be, which meant every field switch reset the
+        // sample buffer — so a measurement could only ever describe the last field opened, and the
+        // "start recording" control could not work at all. Recording is now begun explicitly from
+        // the frame-stats screen and survives field switches, which is what measuring a real typing
+        // session requires.
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        surfaceView?.stopFrameTiming()
+        // Deliberately does not stop timing either: a session spans several fields, and stopping
+        // here would discard the samples at the moment the user moves to the next one.
         super.onFinishInputView(finishingInput)
     }
 

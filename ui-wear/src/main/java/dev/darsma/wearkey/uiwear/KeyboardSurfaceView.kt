@@ -120,7 +120,7 @@ class KeyboardSurfaceView @JvmOverloads constructor(
 
     fun startFrameTiming() = keyGrid.startFrameTiming()
     fun stopFrameTiming() = keyGrid.stopFrameTiming()
-    fun frameStats(): Pair<Int, Int> = keyGrid.frameStats()
+    fun frameStats(): KeyGridView.FrameStats? = keyGrid.frameStats()
 
     companion object {
         /**
