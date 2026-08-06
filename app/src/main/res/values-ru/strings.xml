@@ -37,4 +37,5 @@
     <string name="calibration_no_gain">Вы и так попадаете точно — настройки оставлены прежними.</string>
     <string name="calibration_error_summary">Средний промах: %1$.1f px → %2$.1f px</string>
     <string name="calibration_improvement">Точнее на %1$.0f%%</string>
+    <string name="calibration_pending_title">Прошлая калибровка готова к применению</string>
 </resources>

@@ -40,6 +40,10 @@ class CalibrationActivity : Activity() {
     }
 
     private fun showIntro() {
+        // A result that was computed but never accepted takes priority over the intro — the user
+        // already did the work, so offer it rather than asking them to repeat it.
+        if (showPendingIfAny()) return
+
         root.removeAllViews()
         root.addView(label(getString(R.string.calibration_title), 15f, bold = true))
         root.addView(label(getString(R.string.calibration_intro), 12f))
@@ -55,9 +59,48 @@ class CalibrationActivity : Activity() {
     private fun startCollection() {
         val view = CalibrationView(this)
         view.onCompleteListener = CalibrationView.OnCompleteListener { fit, _ ->
-            runOnUiThread { showResult(fit) }
+            runOnUiThread {
+                // Stash the fit immediately as *pending*, before showing anything.
+                //
+                // A calibration session is 25 deliberate taps and about a minute of the user's
+                // attention. Holding that result only in memory means the watch sleeping, a
+                // notification stealing focus, or the process being reclaimed silently throws all
+                // of it away — which is exactly what happened on the first real session: the taps
+                // were made, no crash occurred, and nothing was saved.
+                //
+                // Pending is not the same as applied: it changes no typing behaviour until the
+                // user accepts it. It only guarantees the work survives long enough to be offered.
+                fit?.let { SettingsStore(this).savePendingCalibration(it.maxRadialDriftPx, it.driftExponent, it.improvementPercent) }
+                showResult(fit)
+            }
         }
         setContentView(view)
+    }
+
+    /**
+     * Offers a fit that was computed but never accepted — see [startCollection] for why one can
+     * exist. Shown on entry so a lost result is one tap from being applied, not 25.
+     */
+    private fun showPendingIfAny(): Boolean {
+        val store = SettingsStore(this)
+        val drift = store.pendingDriftPx ?: return false
+        val exponent = store.pendingDriftExponent ?: return false
+        val improvement = store.pendingImprovementPercent
+
+        root.removeAllViews()
+        root.addView(label(getString(R.string.calibration_pending_title), 14f, bold = true))
+        root.addView(label(getString(R.string.calibration_improvement, improvement), 12f))
+        root.addView(button(getString(R.string.calibration_apply)) {
+            store.saveTouchCalibration(drift, exponent)
+            store.clearPendingCalibration()
+            showMessage(getString(R.string.calibration_applied))
+        })
+        root.addView(button(getString(R.string.calibration_start)) {
+            store.clearPendingCalibration()
+            startCollection()
+        })
+        root.addView(button(getString(R.string.calibration_close)) { finish() })
+        return true
     }
 
     private fun showResult(fit: dev.darsma.wearkey.imecore.touch.CalibrationFit?) {
@@ -89,7 +132,9 @@ class CalibrationActivity : Activity() {
                 label(getString(R.string.calibration_improvement, fit.improvementPercent), 12f)
             )
             root.addView(button(getString(R.string.calibration_apply)) {
-                SettingsStore(this).saveTouchCalibration(fit.maxRadialDriftPx, fit.driftExponent)
+                val store = SettingsStore(this)
+                store.saveTouchCalibration(fit.maxRadialDriftPx, fit.driftExponent)
+                store.clearPendingCalibration()
                 showMessage(getString(R.string.calibration_applied))
             })
         } else {

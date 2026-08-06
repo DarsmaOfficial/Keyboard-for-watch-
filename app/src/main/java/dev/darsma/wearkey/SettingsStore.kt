@@ -58,11 +58,47 @@ class SettingsStore(context: Context) {
         prefs.edit().remove(KEY_DRIFT_PX).remove(KEY_DRIFT_EXPONENT).apply()
     }
 
+    // --- Pending calibration -------------------------------------------------------------
+    //
+    // A completed-but-unaccepted fit. Stored separately from the applied values on purpose: it
+    // must survive the activity dying without ever changing how a tap resolves. A calibration
+    // session costs 25 deliberate taps, and holding that only in memory loses it to a screen
+    // timeout or a reclaimed process — which is precisely what happened on the first real run.
+
+    val pendingDriftPx: Float?
+        get() = if (prefs.contains(KEY_PENDING_DRIFT_PX)) prefs.getFloat(KEY_PENDING_DRIFT_PX, 0f) else null
+
+    val pendingDriftExponent: Float?
+        get() = if (prefs.contains(KEY_PENDING_EXPONENT)) prefs.getFloat(KEY_PENDING_EXPONENT, 2f) else null
+
+    /** Improvement the pending fit claimed, so the offer can be described without recomputing. */
+    val pendingImprovementPercent: Float
+        get() = prefs.getFloat(KEY_PENDING_IMPROVEMENT, 0f)
+
+    fun savePendingCalibration(driftPx: Float, exponent: Float, improvementPercent: Float) {
+        prefs.edit()
+            .putFloat(KEY_PENDING_DRIFT_PX, driftPx)
+            .putFloat(KEY_PENDING_EXPONENT, exponent)
+            .putFloat(KEY_PENDING_IMPROVEMENT, improvementPercent)
+            .apply()
+    }
+
+    fun clearPendingCalibration() {
+        prefs.edit()
+            .remove(KEY_PENDING_DRIFT_PX)
+            .remove(KEY_PENDING_EXPONENT)
+            .remove(KEY_PENDING_IMPROVEMENT)
+            .apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "wearkey_settings"
         private const val KEY_HAPTIC_INTENSITY = "haptic_intensity"
         private const val KEY_LAST_CLEAR = "last_clear_ms"
         private const val KEY_DRIFT_PX = "touch_drift_px"
         private const val KEY_DRIFT_EXPONENT = "touch_drift_exponent"
+        private const val KEY_PENDING_DRIFT_PX = "pending_drift_px"
+        private const val KEY_PENDING_EXPONENT = "pending_drift_exponent"
+        private const val KEY_PENDING_IMPROVEMENT = "pending_improvement"
     }
 }

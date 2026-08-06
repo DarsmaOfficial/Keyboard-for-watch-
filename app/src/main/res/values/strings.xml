@@ -39,4 +39,5 @@
     <string name="calibration_error_summary">Average miss: %1$.1f px → %2$.1f px</string>
     <!-- %1$.0f is the percentage reduction in aiming error. -->
     <string name="calibration_improvement">%1$.0f%% more accurate</string>
+    <string name="calibration_pending_title">Your last calibration is ready to apply</string>
 </resources>
