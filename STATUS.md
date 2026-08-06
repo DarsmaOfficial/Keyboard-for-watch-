@@ -3,7 +3,7 @@
 Snapshot of what is built, what is verified on hardware, and what remains. Written against the
 master prompt (spec §-numbers below refer to it).
 
-**Commit:** `2061f87` · **Repository:** [DarsmaOfficial/Keyboard-for-watch-](https://github.com/DarsmaOfficial/Keyboard-for-watch-)
+**Commit:** `2724801` · **Repository:** [DarsmaOfficial/Keyboard-for-watch-](https://github.com/DarsmaOfficial/Keyboard-for-watch-)
 · **Device:** OnePlus Watch 2 `OPWWE231`, Wear OS 4 / API 34, 466 × 466
 
 A deliberate distinction runs through this document:
@@ -117,7 +117,7 @@ geometry. Real values need a human session — one minute, via *Settings → К�
 
 | Module | Purpose | Status |
 |---|---|---|
-| `:ime-core` | EditorState, caret, touch model, calibration | ✅ 8 files, 38 tests |
+| `:ime-core` | EditorState, caret, touch model, calibration | ✅ 8 files, 42 tests |
 | `:layout-engine` | Declarative JSON layouts | ✅ 2 files, 13 tests |
 | `:ui-wear` | Key grid, composition strip, motion — View + Canvas | ✅ 7 files |
 | `:dict` | mmap dictionary reader | ✅ 5 files, 31 tests |
@@ -125,7 +125,7 @@ geometry. Real values need a human session — one minute, via *Settings → К�
 | `:clipboard` | separate module | ⚠️ implemented inside `:ime-core`/`:app` instead |
 | `:engine-swipe` | DTW path matching | ❌ not started |
 
-**Test coverage: 95 unit tests across four modules**, all passing in CI.
+**Test coverage: 99 unit tests across four modules**, all passing in CI.
 
 `:clipboard` is a deliberate deviation: the store is pure logic (in `:ime-core`, 13 tests) and the
 encryption is Android Keystore (in `:app`). A third module would have added a Gradle boundary
@@ -169,26 +169,39 @@ telemetry. The absence of `INTERNET` makes the offline claim kernel-enforced rat
    measured data.
 5. **Battery (§11.5).** `dumpsys batterystats` idle cost never checked.
 
+### Resolved since the first draft of this document
+
+- **TalkBack virtual view hierarchy (§11.5)** — ✅ **built.** Each key is now an
+  `AccessibilityNodeInfo` node in deliberate traversal order. Touch exploration reads keys without
+  typing them; activation needs an explicit double-tap arriving as `ACTION_CLICK`. Written against
+  the framework rather than `ExploreByTouchHelper`, whose POM pulls `androidx.core` (§12). Key
+  activation was extracted into one path shared by finger and screen reader, so the two cannot
+  drift. *Not yet verified with TalkBack running on the watch.*
+- **Frame-time instrumentation (§14)** — ✅ **built.** `onDraw` is timed directly into a fixed
+  4096-sample buffer, read from a settings screen. The previous implementation called `invalidate()`
+  every frame, which measured a synthetic 60 fps loop rather than the keyboard's real cost and burnt
+  battery doing it. *Numbers still need a real typing session.*
+- **State survival across process death (§11.5)** — ✅ **already satisfied; no code needed.** Every
+  keystroke is committed to the `InputConnection` immediately, so the authoritative text lives in
+  the host app's field and `onStartInputView` restores it via `getExtractedText`. Persisting typed
+  text to our own storage would have added a place for it to leak while recovering data that was
+  never at risk. Four tests pin the invariant so a future change cannot silently invalidate the
+  argument.
+
 ### Not started — code
 
-6. **Swipe / glide typing (§7.3), `:engine-swipe`.** The largest single remaining item. Now
+1. **Swipe / glide typing (§7.3), `:engine-swipe`.** The largest single remaining item. Now
    unblocked: DTW scoring needs exactly the per-key probability distribution the touch model already
    exposes.
-7. **Spatial prediction, eyes-free mode (§7.2b).** R&D, explicitly optional, never default.
-8. **Emoji layer and themes (§11 v0.3).**
-9. **Installable language packs (§4.3).** Each requires an individual licence audit — roughly half
+2. **Spatial prediction, eyes-free mode (§7.2b).** R&D, explicitly optional, never default.
+3. **Emoji layer and themes (§11 v0.3).**
+4. **Installable language packs (§4.3).** Each requires an individual licence audit — roughly half
    of common European languages are copyleft and cannot ship.
-10. **TalkBack virtual view hierarchy (§11.5).** Currently `announceForAccessibility` plus per-key
-    descriptions; the spec asks for full `AccessibilityNodeInfo` semantics with custom tap actions,
-    so exploration never misfires a keypress. **This is a real gap, not a polish item** — screen
-    reader users cannot currently explore the grid safely.
-11. **State survival across process death (§11.5).** Composition state is not persisted; the spec
-    requires it to survive the IME being killed under memory pressure.
-12. **Instrumented IME lifecycle smoke test (§9).** Zero `androidTest` sources exist.
-13. **First-run tutorial (§11.5).**
-14. **Release signing + reproducible offline build (§13, §3.1).** No release keystore yet, and the
-    "builds offline from a clean machine" claim needs dependency locking and checksums to be a fact
-    rather than an aspiration.
+5. **Instrumented IME lifecycle smoke test (§9).** Zero `androidTest` sources exist.
+6. **First-run tutorial (§11.5).**
+7. **Release signing + reproducible offline build (§13, §3.1).** No release keystore yet, and the
+   "builds offline from a clean machine" claim needs dependency locking and checksums to be a fact
+   rather than an aspiration.
 
 ---
 
