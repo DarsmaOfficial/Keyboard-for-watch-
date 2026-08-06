@@ -19,4 +19,24 @@
     <string name="settings_cleared">Cleared</string>
     <string name="settings_licenses">Open source licences</string>
     <string name="settings_privacy_note">No network access. No microphone. Nothing leaves this watch.</string>
+
+    <!-- Touch calibration (spec §7.1) -->
+    <string name="settings_calibration">Calibrate touch</string>
+    <string name="calibration_title">Calibrate touch</string>
+    <string name="calibration_intro">Tap each dot as accurately as you can. Takes about a minute.</string>
+    <string name="calibration_start">Start</string>
+    <string name="calibration_retry">Try again</string>
+    <string name="calibration_close">Close</string>
+    <string name="calibration_apply">Apply</string>
+    <string name="calibration_applied">Calibration applied</string>
+    <string name="calibration_reset">Reset to defaults</string>
+    <string name="calibration_reset_done">Defaults restored</string>
+    <string name="calibration_done">Finished</string>
+    <string name="calibration_failed">Not enough usable taps</string>
+    <string name="calibration_failed_detail">Nothing was changed. Try again, tapping the centre of each dot.</string>
+    <string name="calibration_no_gain">Your aim is already accurate — keeping the current settings.</string>
+    <!-- %1$.1f is the average miss in pixels before correction, %2$.1f after. -->
+    <string name="calibration_error_summary">Average miss: %1$.1f px → %2$.1f px</string>
+    <!-- %1$.0f is the percentage reduction in aiming error. -->
+    <string name="calibration_improvement">%1$.0f%% more accurate</string>
 </resources>

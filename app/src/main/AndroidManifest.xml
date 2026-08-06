@@ -79,5 +79,11 @@
             android:label="@string/settings_licenses"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
 
+        <activity
+            android:name=".CalibrationActivity"
+            android:exported="false"
+            android:label="@string/calibration_title"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
     </application>
 </manifest>

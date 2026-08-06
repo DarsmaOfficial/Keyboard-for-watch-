@@ -28,9 +28,41 @@ class SettingsStore(context: Context) {
         prefs.edit().putLong(KEY_LAST_CLEAR, System.currentTimeMillis()).apply()
     }
 
+    /** True once the user has run touch calibration and accepted the result (spec §7.1). */
+    val hasTouchCalibration: Boolean
+        get() = prefs.contains(KEY_DRIFT_PX)
+
+    /**
+     * Fitted radial drift magnitude in pixels, or null when uncalibrated.
+     *
+     * Null rather than a default, so the caller decides what "uncalibrated" means. Returning a
+     * default here would make a calibrated-to-zero device indistinguishable from an uncalibrated
+     * one, and zero is a legitimate fit — some people simply do not drift.
+     */
+    val touchDriftPx: Float?
+        get() = if (prefs.contains(KEY_DRIFT_PX)) prefs.getFloat(KEY_DRIFT_PX, 0f) else null
+
+    /** Fitted growth exponent of the drift correction, or null when uncalibrated. */
+    val touchDriftExponent: Float?
+        get() = if (prefs.contains(KEY_DRIFT_EXPONENT)) prefs.getFloat(KEY_DRIFT_EXPONENT, 2f) else null
+
+    fun saveTouchCalibration(driftPx: Float, exponent: Float) {
+        prefs.edit()
+            .putFloat(KEY_DRIFT_PX, driftPx)
+            .putFloat(KEY_DRIFT_EXPONENT, exponent)
+            .apply()
+    }
+
+    /** Restores the shipped defaults. Always reachable — calibration must never be a trap. */
+    fun clearTouchCalibration() {
+        prefs.edit().remove(KEY_DRIFT_PX).remove(KEY_DRIFT_EXPONENT).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "wearkey_settings"
         private const val KEY_HAPTIC_INTENSITY = "haptic_intensity"
         private const val KEY_LAST_CLEAR = "last_clear_ms"
+        private const val KEY_DRIFT_PX = "touch_drift_px"
+        private const val KEY_DRIFT_EXPONENT = "touch_drift_exponent"
     }
 }

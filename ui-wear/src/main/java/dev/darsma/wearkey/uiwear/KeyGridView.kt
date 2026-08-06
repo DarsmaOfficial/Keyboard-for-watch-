@@ -180,6 +180,18 @@ class KeyGridView @JvmOverloads constructor(
 
     /** Touch targets mirroring [keys] by index. Rebuilt per layout, never per touch event. */
     private var touchTargets: List<KeyTarget> = emptyList()
+
+    /**
+     * Touch model tuning. Defaults are the shipped estimates; the host sets this from a saved
+     * calibration (spec §7.1) when the user has run one. Assigning rebuilds the model in place,
+     * so a calibration can be applied without recreating the keyboard.
+     */
+    var touchConfig: TouchModel.Config = TouchModel.Config()
+        set(value) {
+            field = value
+            val existing = touchModel ?: return
+            touchModel = TouchModel(existing.display, value)
+        }
     private var pressedKey: Key? = null
 
     /** Amplitude-only haptics per spec §8.1. Exposed so settings can adjust intensity later. */
@@ -382,7 +394,7 @@ class KeyGridView @JvmOverloads constructor(
         // Hand the same geometry to the touch model (spec §7.1). Note circleCenterYInView is
         // normally negative — the circle's centre sits above this view's origin — and the sign
         // matters: inverting it would make the radial drift correction pull inward.
-        touchModel = TouchModel(RoundDisplay(circleCenterX, circleCenterYInView, radius))
+        touchModel = TouchModel(RoundDisplay(circleCenterX, circleCenterYInView, radius), touchConfig)
 
         for ((rowIndex, row) in letterRows.withIndex()) {
             val top = gridTop + rowIndex * rowHeight

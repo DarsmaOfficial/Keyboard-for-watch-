@@ -68,6 +68,14 @@ class SettingsActivity : Activity() {
             }
         )
 
+        // Touch calibration (spec §7.1). The drift model's constants are shipped as estimates;
+        // this is how they become measurements for a particular wrist and finger.
+        column.addView(
+            row(getString(R.string.settings_calibration), null) {
+                startActivity(Intent(this, CalibrationActivity::class.java))
+            }
+        )
+
         // Open source licenses — REQUIRED to be viewable offline in-app (spec §3.2). BSD
         // redistribution terms are not satisfied by a link, and a link would break the
         // no-network rule anyway.

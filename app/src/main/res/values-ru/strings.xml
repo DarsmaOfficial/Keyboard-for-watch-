@@ -19,4 +19,22 @@
     <string name="settings_cleared">Удалено</string>
     <string name="settings_licenses">Лицензии</string>
     <string name="settings_privacy_note">Нет доступа к сети. Нет микрофона. Ничего не покидает часы.</string>
+
+    <!-- Калибровка касаний (спец. §7.1) -->
+    <string name="settings_calibration">Калибровка касаний</string>
+    <string name="calibration_title">Калибровка касаний</string>
+    <string name="calibration_intro">Нажимайте на каждую точку как можно точнее. Займёт около минуты.</string>
+    <string name="calibration_start">Начать</string>
+    <string name="calibration_retry">Ещё раз</string>
+    <string name="calibration_close">Закрыть</string>
+    <string name="calibration_apply">Применить</string>
+    <string name="calibration_applied">Калибровка применена</string>
+    <string name="calibration_reset">Сбросить настройки</string>
+    <string name="calibration_reset_done">Настройки сброшены</string>
+    <string name="calibration_done">Готово</string>
+    <string name="calibration_failed">Недостаточно точных нажатий</string>
+    <string name="calibration_failed_detail">Ничего не изменено. Попробуйте ещё раз, нажимая в центр каждой точки.</string>
+    <string name="calibration_no_gain">Вы и так попадаете точно — настройки оставлены прежними.</string>
+    <string name="calibration_error_summary">Средний промах: %1$.1f px → %2$.1f px</string>
+    <string name="calibration_improvement">Точнее на %1$.0f%%</string>
 </resources>

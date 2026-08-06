@@ -17,4 +17,7 @@
     <string name="a11y_shift">Регистр</string>
     <string name="a11y_shift_on">Регистр включён</string>
     <string name="a11y_caps_lock">Верхний регистр</string>
+
+    <!-- Калибровка касаний (спец. §7.1). %1$d — сколько целей осталось. -->
+    <string name="calibration_remaining">осталось: %1$d</string>
 </resources>

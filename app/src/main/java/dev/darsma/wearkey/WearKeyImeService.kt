@@ -180,7 +180,20 @@ class WearKeyImeService : InputMethodService() {
 
         // Apply the saved haptic intensity every time the keyboard is shown, so a change in
         // settings takes effect on the next field without needing a restart.
-        surfaceView?.keyGrid?.haptics?.intensity = SettingsStore(this).hapticIntensity
+        val settings = SettingsStore(this)
+        surfaceView?.keyGrid?.haptics?.intensity = settings.hapticIntensity
+
+        // Same for touch calibration (spec §7.1): a fit accepted in settings must take effect on
+        // the very next field, not after an IME restart. Absent calibration leaves the shipped
+        // defaults untouched.
+        val driftPx = settings.touchDriftPx
+        val exponent = settings.touchDriftExponent
+        if (driftPx != null && exponent != null) {
+            surfaceView?.keyGrid?.touchConfig = dev.darsma.wearkey.imecore.touch.TouchModel.Config(
+                maxRadialDriftPx = driftPx,
+                driftExponent = exponent
+            )
+        }
 
         // Spec §11.5: never carry text between fields — full reset on every new editor, even
         // if the previous field was never explicitly finished (rapid field-switching case).

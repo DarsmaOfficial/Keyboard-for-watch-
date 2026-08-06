@@ -98,7 +98,8 @@ data class RoundDisplay(val centerX: Float, val centerY: Float, val radius: Floa
  * Pure Kotlin with no Android types, so all of this is unit-testable on the JVM.
  */
 class TouchModel(
-    private val display: RoundDisplay,
+    /** Display geometry this model was built for; exposed so callers can rebuild with new tuning. */
+    val display: RoundDisplay,
     private val config: Config = Config()
 ) {
 

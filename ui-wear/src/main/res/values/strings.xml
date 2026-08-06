@@ -17,4 +17,7 @@
     <string name="a11y_shift">Shift</string>
     <string name="a11y_shift_on">Shift on</string>
     <string name="a11y_caps_lock">Caps lock on</string>
+
+    <!-- Touch calibration (spec §7.1). %1$d is how many targets are left to tap. -->
+    <string name="calibration_remaining">%1$d left</string>
 </resources>
