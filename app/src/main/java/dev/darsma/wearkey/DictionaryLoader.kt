@@ -4,88 +4,84 @@ import android.content.Context
 import dev.darsma.wearkey.dict.SpellEngine
 import dev.darsma.wearkey.uiwear.KeyGridView
 import java.io.FileInputStream
+import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
-import java.util.concurrent.Executors
 
 /**
- * Memory-maps the bundled dictionary index into [SpellEngine], off the main thread.
+ * Memory-maps the bundled dictionary index into [SpellEngine].
+ *
+ * ## Why this is synchronous
+ *
+ * The original SymSpellKt implementation parsed 10–30k text entries and built tens of thousands
+ * of Java objects, so loading correctly ran on a background executor. The mapped index does none
+ * of that: `openFd` + `FileChannel.map` is one fast system call and [SpellEngine.load] only checks
+ * a 20-byte header. Keeping the executor after the work disappeared introduced a real race:
+ * switching EN→RU changed the visible key labels immediately while queued dictionary requests
+ * could complete out of order, silently leaving English correction behind the Cyrillic layout.
+ * Found on-device when `привт` produced no `привет` suggestion even though direct inspection of
+ * ru.bin found the correct bucket.
+ *
+ * Mapping synchronously makes the invariant structural: when the visible layout changes, the
+ * matching index is resident before control returns. No queue, no stale completion, no need for
+ * callbacks. The operation is far below one frame and touches no index pages until lookup.
  *
  * ## Why mapping rather than reading
  *
- * The index is mapped with [FileChannel.map], so its pages are clean, file-backed and evictable
- * under memory pressure. They are accounted as mapped pages rather than as Java heap, which is
- * what keeps one resident dictionary inside the specification's 8 MB heap gate (§14). Reading the
- * same data into Java objects is what the previous SymSpellKt implementation did, and it measured
- * 15.5 MB on the watch — see `WordIndex` for the full measurement history.
- *
- * ## Why the asset is copied out first
- *
- * `AssetManager` cannot hand back a mappable file descriptor for a *compressed* asset, and the
- * Android build compresses assets by default. Two options exist: mark the extension
- * `noCompress` so `openFd` can be used directly, or copy the asset into app storage once and map
- * that. This uses `noCompress` (declared in build.gradle.kts) **and** falls back to a one-time
- * copy, because a mapped file must stay valid for the life of the buffer and relying on the
- * packaging flag alone would fail silently if it were ever dropped.
+ * The indexes are stored uncompressed in the APK (`noCompress.add("bin")`, CI-enforced), so
+ * [android.content.res.AssetManager.openFd] exposes the APK file descriptor plus the asset's byte
+ * offset and length. We map that range directly: pages are clean, file-backed, shareable across
+ * process restarts and evictable under pressure. Measured Dalvik heap stays ~2.5 MB with either
+ * language, against the specification's 8 MB gate; the old SymSpellKt object graph used 15.5 MB
+ * for the same 10k vocabulary.
  *
  * ## Failure behaviour
  *
- * Every path is wrapped: a missing, truncated or corrupt index leaves the engine unloaded and the
- * keyboard degrades to layout-only typing. A keyboard that crashes leaves the user unable to type
- * at all, which is far worse than one without autocorrect (spec §11 failure modes).
- *
- * Only one language is resident at a time (spec §4.2, heap budget). Switching layouts swaps the
- * index rather than keeping both mapped.
+ * A missing, compressed, truncated or corrupt index unloads correction and returns false. The
+ * keyboard continues as a layout-only IME — it must never crash and leave the user unable to type
+ * (spec §11 failure modes).
  */
 class DictionaryLoader(
     private val context: Context,
     private val engine: SpellEngine
 ) {
 
-    private val executor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "wearkey-dict").apply {
-            isDaemon = true
-            priority = Thread.MIN_PRIORITY
-        }
-    }
-
+    /** The language whose index successfully loaded — never a merely requested language. */
     @Volatile
     private var loadedLayout: KeyGridView.Layout? = null
 
-    /** Maps the index for [layout] unless it is already the resident one. */
-    fun loadFor(layout: KeyGridView.Layout) {
-        if (loadedLayout == layout) return
-        loadedLayout = layout
+    /**
+     * Maps the index for [layout]. Returns true only when the engine accepted it.
+     *
+     * Synchronized for defensive correctness if a future caller invokes this off the main thread;
+     * current calls all come from InputMethodService callbacks on the main thread.
+     */
+    @Synchronized
+    fun loadFor(layout: KeyGridView.Layout): Boolean {
+        if (loadedLayout == layout && engine.isReady) return true
 
         val assetName = when (layout) {
             KeyGridView.Layout.EN_US -> "en.bin"
             KeyGridView.Layout.RU_RU -> "ru.bin"
         }
 
-        executor.execute {
-            runCatching { mapIndex(assetName) }
-                .onSuccess { engine.load(it) }
-                .onFailure {
-                    engine.unload()
-                    // Allow a later retry rather than pinning the failure permanently.
-                    loadedLayout = null
-                }
-        }
+        return runCatching {
+            engine.load(mapIndex(assetName))
+            check(engine.isReady) { "invalid dictionary index: $assetName" }
+        }.fold(
+            onSuccess = {
+                loadedLayout = layout
+                true
+            },
+            onFailure = {
+                engine.unload()
+                loadedLayout = null
+                false
+            }
+        )
     }
 
-    /**
-     * Returns a read-only mapping directly into the APK's stored asset.
-     *
-     * `openFd` exposes three things: the APK file descriptor, the byte offset at which this asset
-     * starts, and its length. Because `.bin` is explicitly `noCompress`, those bytes are the
-     * original file and can be mapped in place — no extraction, no duplicate in app storage, and
-     * the same clean pages can be shared across process restarts.
-     *
-     * A direct mapping also avoids a real failure found on-device in the first implementation:
-     * EN extracted and mapped, but switching to RU changed the visible keys while `ru.bin` never
-     * appeared in `no_backup`, silently leaving English correction active. Removing extraction
-     * removes that whole failure mode.
-     */
-    private fun mapIndex(assetName: String): java.nio.ByteBuffer {
+    /** Directly maps one stored APK asset; no extracted copy and no heap-sized byte array. */
+    private fun mapIndex(assetName: String): ByteBuffer {
         val descriptor = context.assets.openFd("dictionaries/$assetName")
         return descriptor.use { asset ->
             FileInputStream(asset.fileDescriptor).channel.use { channel ->
@@ -94,7 +90,6 @@ class DictionaryLoader(
         }
     }
 
-    fun shutdown() {
-        executor.shutdownNow()
-    }
+    /** Kept so the service lifecycle stays stable; there is no background worker to stop now. */
+    fun shutdown() = Unit
 }
