@@ -193,12 +193,33 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
 
 ### Resolved since the first draft of this document
 
-- **TalkBack virtual view hierarchy (§11.5)** — ✅ **built.** Each key is now an
-  `AccessibilityNodeInfo` node in deliberate traversal order. Touch exploration reads keys without
-  typing them; activation needs an explicit double-tap arriving as `ACTION_CLICK`. Written against
-  the framework rather than `ExploreByTouchHelper`, whose POM pulls `androidx.core` (§12). Key
-  activation was extracted into one path shared by finger and screen reader, so the two cannot
-  drift. *Not yet verified with TalkBack running on the watch.*
+- **TalkBack virtual view hierarchy (§11.5)** — ⚠️ **built, and demonstrably not yet working.**
+  Each key is an `AccessibilityNodeInfo` node in deliberate traversal order, activation arrives as
+  `ACTION_CLICK`, and hover routing was added. Written against the framework rather than
+  `ExploreByTouchHelper`, whose POM pulls `androidx.core` (§12).
+
+  **Tested with TalkBack actually running, and it failed.** A single tap on `h` — which under touch
+  exploration must only announce the key — typed `h` into the field. Repeated across three keys:
+  `hqb`. This is exactly the failure §11.5 names, and it makes the keyboard unusable with a screen
+  reader, because the only way to identify a key is to type it.
+
+  A control test proved the harness was sound: the same single `adb input tap` on an ordinary
+  settings row only moved TalkBack's focus ring without activating the row. So exploration works on
+  normal views and the keyboard genuinely bypasses it.
+
+  Three fixes attempted so far, each addressing a real defect but none sufficient:
+  1. `dispatchHoverEvent` routing — the provider had no hover handling at all, so exploration
+     gestures fell through to `onTouchEvent`.
+  2. `importantForAccessibility = YES` — a Canvas view with no text resolves AUTO to *not
+     important*, which excludes it from the tree entirely.
+  3. Removing the `contentDescription` added in (2) — a labelled view is treated as a leaf, so the
+     framework stops descending and never asks for the virtual children.
+
+  The framework's own diagnostic is the thing to trust here: `dumpsys accessibility` shows the IME
+  window present at correct bounds with **`hasChildren=false`** — present, sized, empty. Until that
+  reads true, the node tree is not reachable, whatever the source says.
+
+  *Verification of fix (3) is incomplete — the watch went on charge mid-test.*
 - **Frame-time instrumentation (§14)** — ✅ **built and measured.** `onDraw` is timed directly into
   a fixed 4096-sample buffer, read from a settings screen. The previous implementation called
   `invalidate()` every frame, which measured a synthetic 60 fps loop rather than the keyboard's real
