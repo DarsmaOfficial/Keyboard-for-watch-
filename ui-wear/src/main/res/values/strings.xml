@@ -20,4 +20,5 @@
 
     <!-- Touch calibration (spec §7.1). %1$d is how many targets are left to tap. -->
     <string name="calibration_remaining">%1$d left</string>
+    <string name="a11y_keyboard">Keyboard</string>
 </resources>

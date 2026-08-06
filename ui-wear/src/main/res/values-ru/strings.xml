@@ -20,4 +20,5 @@
 
     <!-- Калибровка касаний (спец. §7.1). %1$d — сколько целей осталось. -->
     <string name="calibration_remaining">осталось: %1$d</string>
+    <string name="a11y_keyboard">Клавиатура</string>
 </resources>

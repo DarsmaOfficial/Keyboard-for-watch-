@@ -857,6 +857,23 @@ class KeyGridView @JvmOverloads constructor(
         )
     }
 
+    init {
+        // Without this the entire accessibility provider is dead code, and it fails silently.
+        //
+        // A custom View that draws its content on a Canvas has no text and no contentDescription,
+        // so IMPORTANT_FOR_ACCESSIBILITY_AUTO resolves to *not important*: the framework excludes
+        // the view from the accessibility tree and therefore never calls
+        // getAccessibilityNodeProvider() at all. Verified on the watch — with TalkBack running,
+        // `uiautomator dump` contained zero nodes from this package while the IME was visible, and
+        // exploring a key typed it because the touch was never converted into a hover.
+        //
+        // Declaring the view important is what makes the framework ask for the provider, at which
+        // point the virtual key nodes and hover routing start working.
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+        isFocusable = true
+        contentDescription = context.getString(R.string.a11y_keyboard)
+    }
+
     override fun getAccessibilityNodeProvider(): android.view.accessibility.AccessibilityNodeProvider =
         accessibilityProvider
 
