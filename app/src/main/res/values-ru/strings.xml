@@ -38,4 +38,12 @@
     <string name="calibration_error_summary">Средний промах: %1$.1f px → %2$.1f px</string>
     <string name="calibration_improvement">Точнее на %1$.0f%%</string>
     <string name="calibration_pending_title">Прошлая калибровка готова к применению</string>
+    <!-- Измерение времени кадра (спец. §14) -->
+    <string name="settings_frame_stats">Время кадра</string>
+    <string name="frame_stats_title">Время кадра</string>
+    <string name="frame_stats_start">Начать запись</string>
+    <string name="frame_stats_read">Показать результат</string>
+    <string name="frame_stats_recording">Идёт запись — печатайте, затем вернитесь</string>
+    <string name="frame_stats_none">Пока нет данных</string>
+    <string name="frame_stats_samples">измерено кадров: %1$d</string>
 </resources>

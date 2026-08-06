@@ -76,6 +76,15 @@ class SettingsActivity : Activity() {
             }
         )
 
+        // Frame-time measurement (spec §14). Developer-facing, but it lives here rather than behind
+        // a hidden gesture: the gate has to be re-checked after any rendering change, and a
+        // measurement that is awkward to take is a measurement that stops being taken.
+        column.addView(
+            row(getString(R.string.settings_frame_stats), null) {
+                startActivity(Intent(this, FrameStatsActivity::class.java))
+            }
+        )
+
         // Open source licenses — REQUIRED to be viewable offline in-app (spec §3.2). BSD
         // redistribution terms are not satisfied by a link, and a link would break the
         // no-network rule anyway.

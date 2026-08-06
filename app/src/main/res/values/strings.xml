@@ -40,4 +40,12 @@
     <!-- %1$.0f is the percentage reduction in aiming error. -->
     <string name="calibration_improvement">%1$.0f%% more accurate</string>
     <string name="calibration_pending_title">Your last calibration is ready to apply</string>
+    <!-- Frame-time measurement (spec §14) -->
+    <string name="settings_frame_stats">Frame timing</string>
+    <string name="frame_stats_title">Frame timing</string>
+    <string name="frame_stats_start">Start recording</string>
+    <string name="frame_stats_read">Read result</string>
+    <string name="frame_stats_recording">Recording — go and type, then come back</string>
+    <string name="frame_stats_none">No samples yet</string>
+    <string name="frame_stats_samples">%1$d draws measured</string>
 </resources>

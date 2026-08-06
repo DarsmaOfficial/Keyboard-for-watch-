@@ -52,6 +52,9 @@ class WearKeyImeService : InputMethodService() {
 
     override fun onDestroy() {
         dictionaryLoader.shutdown()
+        // Drop the static view reference before the service goes away, so a torn-down keyboard
+        // cannot be retained by the frame-stats screen.
+        liveKeyGrid = null
         super.onDestroy()
     }
 
@@ -151,6 +154,7 @@ class WearKeyImeService : InputMethodService() {
         }
 
         surfaceView = view
+        liveKeyGrid = view.keyGrid
         return view
     }
 
@@ -431,6 +435,29 @@ class WearKeyImeService : InputMethodService() {
     }
 
     companion object {
+        /**
+         * The live keyboard view, for the frame-stats screen only (spec §14).
+         *
+         * A static reference to a View is normally a leak waiting to happen. It is acceptable here
+         * only because it is cleared in onDestroy, and because the alternative — a bound Service or
+         * a ContentProvider — is a great deal of machinery to move six floats across a process
+         * boundary for a developer-facing measurement.
+         *
+         * Deliberately a plain nullable rather than a WeakReference: null after teardown is exactly
+         * the semantics wanted, and a WeakReference would add the possibility of the stats vanishing
+         * mid-session for reasons unrelated to the keyboard.
+         */
+        @Volatile
+        private var liveKeyGrid: KeyGridView? = null
+
+        /** Begins recording draw durations on the live keyboard, if one is showing. */
+        fun startFrameTiming() {
+            liveKeyGrid?.startFrameTiming()
+        }
+
+        /** Percentile summary of the recorded draws, or null when nothing has been measured. */
+        fun frameStats(): KeyGridView.FrameStats? = liveKeyGrid?.frameStats()
+
         /** Characters that end a word for suggestion purposes. */
         private val WORD_SEPARATORS = charArrayOf(' ', '\n', '\t', '.', ',', '!', '?', ';', ':')
 

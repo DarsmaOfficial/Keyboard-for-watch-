@@ -85,5 +85,11 @@
             android:label="@string/calibration_title"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
 
+        <activity
+            android:name=".FrameStatsActivity"
+            android:exported="false"
+            android:label="@string/frame_stats_title"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
     </application>
 </manifest>
