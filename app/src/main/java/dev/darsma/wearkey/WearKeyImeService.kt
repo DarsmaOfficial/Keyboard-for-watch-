@@ -215,6 +215,20 @@ class WearKeyImeService : InputMethodService() {
 
         // Prime EditorState with whatever the field already contains, if not masked — masked
         // fields must never see plaintext, not even transiently (spec §5).
+        //
+        // This is also what satisfies spec §11.5's "state must survive process death". It is worth
+        // being precise about why, because the obvious reading suggests persisting the composition
+        // to disk, and that would be a privacy cost for no benefit:
+        //
+        // This IME never leaves text uncommitted. Every keystroke goes to InputConnection
+        // .commitText immediately (see handleKey), so the text lives in the *host app's* field, not
+        // in a buffer of ours. When the IME is killed under memory pressure and recreated, this
+        // getExtractedText call restores the full contents and caret from the field itself. Nothing
+        // was ever ours to lose.
+        //
+        // Writing typed text to our own storage would therefore add a place for it to leak while
+        // recovering data that is already safe. The invariant this depends on — commit immediately,
+        // never hold a composing region — is pinned by ImeCommitInvariantTest.
         if (!masked) {
             val existing = currentInputConnection
                 ?.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)
