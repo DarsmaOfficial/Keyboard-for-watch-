@@ -52,6 +52,9 @@ class WearKeyImeService : InputMethodService() {
 
     override fun onDestroy() {
         dictionaryLoader.shutdown()
+        // Capture whatever was measured before dropping the reference, otherwise the numbers die
+        // with the view that produced them and the stats screen can never show anything.
+        onKeyGridHidden()
         // Drop the static view reference before the service goes away, so a torn-down keyboard
         // cannot be retained by the frame-stats screen.
         liveKeyGrid = null
@@ -154,7 +157,9 @@ class WearKeyImeService : InputMethodService() {
         }
 
         surfaceView = view
-        liveKeyGrid = view.keyGrid
+        // Registers the grid and starts recording if measurement was requested from Settings,
+        // where no keyboard existed yet to receive the request.
+        onKeyGridShown(view.keyGrid)
         return view
     }
 
@@ -262,6 +267,11 @@ class WearKeyImeService : InputMethodService() {
     override fun onFinishInputView(finishingInput: Boolean) {
         // Deliberately does not stop timing either: a session spans several fields, and stopping
         // here would discard the samples at the moment the user moves to the next one.
+        //
+        // It does snapshot them. Reading the numbers means leaving the field for Settings, which
+        // is precisely the action that tears the keyboard down — so without a snapshot here the
+        // measurement would be unreadable by construction.
+        onKeyGridHidden()
         super.onFinishInputView(finishingInput)
     }
 
@@ -469,13 +479,56 @@ class WearKeyImeService : InputMethodService() {
         @Volatile
         private var liveKeyGrid: KeyGridView? = null
 
-        /** Begins recording draw durations on the live keyboard, if one is showing. */
+        /**
+         * Set when measurement has been requested but no keyboard was showing to receive it.
+         *
+         * This is the whole difficulty with measuring an IME from a settings screen: the two are
+         * never on screen at the same time. Pressing "start" in Settings used to call straight
+         * through to `liveKeyGrid`, which was necessarily null at that moment, so the request was
+         * silently dropped and a full typing session afterwards recorded nothing — the screen just
+         * kept reporting "no data", which looked like a measurement of zero draws rather than a
+         * request that never arrived.
+         *
+         * Latching the request instead means the next keyboard to appear starts recording, which
+         * is exactly the session the user is about to perform.
+         */
+        @Volatile
+        private var frameTimingRequested = false
+
+        /** Percentiles from the last completed session, kept after the keyboard is dismissed. */
+        @Volatile
+        private var lastFrameStats: KeyGridView.FrameStats? = null
+
+        /**
+         * Requests draw-duration recording. Applies immediately when a keyboard is showing, and
+         * otherwise arms the next one — so this works from Settings, where no IME is visible.
+         */
         fun startFrameTiming() {
+            frameTimingRequested = true
+            lastFrameStats = null
             liveKeyGrid?.startFrameTiming()
         }
 
-        /** Percentile summary of the recorded draws, or null when nothing has been measured. */
-        fun frameStats(): KeyGridView.FrameStats? = liveKeyGrid?.frameStats()
+        /**
+         * Percentile summary of the recorded draws, or null when nothing has been measured.
+         *
+         * Prefers the live grid, then falls back to the snapshot captured when the keyboard was
+         * last dismissed. Without that fallback the numbers would be unreadable by construction:
+         * leaving the field to open Settings is what tears down the very view holding them.
+         */
+        fun frameStats(): KeyGridView.FrameStats? =
+            liveKeyGrid?.frameStats() ?: lastFrameStats
+
+        /** Called by the service as the keyboard view appears, to honour a pending request. */
+        internal fun onKeyGridShown(grid: KeyGridView) {
+            liveKeyGrid = grid
+            if (frameTimingRequested) grid.startFrameTiming()
+        }
+
+        /** Called as the keyboard goes away, preserving whatever it measured. */
+        internal fun onKeyGridHidden() {
+            liveKeyGrid?.frameStats()?.let { lastFrameStats = it }
+        }
 
         /** Characters that end a word for suggestion purposes. */
         private val WORD_SEPARATORS = charArrayOf(' ', '\n', '\t', '.', ',', '!', '?', ';', ':')
