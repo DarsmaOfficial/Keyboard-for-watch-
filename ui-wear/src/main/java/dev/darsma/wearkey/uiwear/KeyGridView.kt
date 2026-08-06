@@ -573,6 +573,11 @@ class KeyGridView @JvmOverloads constructor(
         // target list would silently map taps to the previous layout's keys after a language or
         // layer switch.
         rebuildTouchTargets()
+
+        // Virtual view ids are key indices, so a layout change reassigns them. Tell the
+        // accessibility framework to discard the old tree; a screen reader holding a stale node
+        // would otherwise announce one key and activate another.
+        accessibilityProvider.notifyLayoutChanged()
     }
 
     /** Half-width of the horizontal chord of a circle of [radius] at vertical offset [dy]. */
@@ -682,43 +687,7 @@ class KeyGridView @JvmOverloads constructor(
                 animatePressTo(1f)
                 invalidate()
                 if (released != null) {
-                    announceForKey(released)
-                    // Haptics fire on release, matching where the action actually happens
-                    // (spec §8.1 amplitude map).
-                    haptics.perform(
-                        when (released.action) {
-                            KeyAction.Backspace -> HapticFeedback.Feedback.BACKSPACE
-                            KeyAction.Enter -> HapticFeedback.Feedback.ENTER
-                            KeyAction.Space,
-                            KeyAction.Shift,
-                            KeyAction.SymbolLayer,
-                            KeyAction.SwitchLanguage,
-                            KeyAction.Clipboard -> HapticFeedback.Feedback.SPACE_OR_LAYER
-                            is KeyAction.Character -> HapticFeedback.Feedback.KEY_TAP
-                        }
-                    )
-                    // Layer/shift state is owned by this view, so handle those here and let the
-                    // host only deal with actions that produce text or need an InputConnection.
-                    when (released.action) {
-                        KeyAction.Shift -> {
-                            if (symbolLayerVisible) {
-                                symbolPage = if (symbolPage == 0) 1 else 0
-                            } else {
-                                shiftState = when (shiftState) {
-                                    ShiftState.OFF -> ShiftState.SHIFTED
-                                    ShiftState.SHIFTED -> ShiftState.CAPS_LOCK
-                                    ShiftState.CAPS_LOCK -> ShiftState.OFF
-                                }
-                            }
-                        }
-                        KeyAction.SymbolLayer -> symbolLayerVisible = !symbolLayerVisible
-                        is KeyAction.Character -> {
-                            // One-shot shift releases after a single character, caps lock does not.
-                            if (shiftState == ShiftState.SHIFTED) shiftState = ShiftState.OFF
-                        }
-                        else -> Unit
-                    }
-                    onKeyListener?.onKey(released.action)
+                    handleKeyAction(released)
                     return true
                 }
                 return false
@@ -797,11 +766,99 @@ class KeyGridView @JvmOverloads constructor(
      * Announces what just happened, so screen-reader users get confirmation of a committed
      * character or a layer change rather than silence (spec §11.5: "announce state changes,
      * not just key labels").
+     *
+     * This is confirmation *after* an action. Guidance *before* one — reading a key while the
+     * finger explores it, without typing it — is the accessibility provider's job, below.
      */
     private fun announceForKey(key: Key) {
         if (!isAccessibilityActive()) return
         announceForAccessibility(describeKey(key))
     }
+
+    /**
+     * Everything that happens when a key is activated: announcement, haptics, local state, then the
+     * host callback.
+     *
+     * Deliberately the single path for *both* a finger release and a screen-reader double-tap. When
+     * this logic lived inline in the touch handler, an accessibility activation would have had to
+     * duplicate it — and duplicated interaction logic drifts, so shift or the symbol layer would
+     * eventually behave differently depending on whether TalkBack was running. That class of bug is
+     * invisible to anyone not using a screen reader, which is precisely why it must be prevented
+     * structurally rather than by care.
+     */
+    private fun handleKeyAction(key: Key) {
+        announceForKey(key)
+        // Haptics fire on activation, matching where the action actually happens (spec §8.1).
+        haptics.perform(
+            when (key.action) {
+                KeyAction.Backspace -> HapticFeedback.Feedback.BACKSPACE
+                KeyAction.Enter -> HapticFeedback.Feedback.ENTER
+                KeyAction.Space,
+                KeyAction.Shift,
+                KeyAction.SymbolLayer,
+                KeyAction.SwitchLanguage,
+                KeyAction.Clipboard -> HapticFeedback.Feedback.SPACE_OR_LAYER
+                is KeyAction.Character -> HapticFeedback.Feedback.KEY_TAP
+            }
+        )
+        // Layer/shift state is owned by this view, so handle those here and let the host deal only
+        // with actions that produce text or need an InputConnection.
+        when (key.action) {
+            KeyAction.Shift -> {
+                if (symbolLayerVisible) {
+                    symbolPage = if (symbolPage == 0) 1 else 0
+                } else {
+                    shiftState = when (shiftState) {
+                        ShiftState.OFF -> ShiftState.SHIFTED
+                        ShiftState.SHIFTED -> ShiftState.CAPS_LOCK
+                        ShiftState.CAPS_LOCK -> ShiftState.OFF
+                    }
+                }
+            }
+            KeyAction.SymbolLayer -> symbolLayerVisible = !symbolLayerVisible
+            is KeyAction.Character -> {
+                // One-shot shift releases after a single character, caps lock does not.
+                if (shiftState == ShiftState.SHIFTED) shiftState = ShiftState.OFF
+            }
+            else -> Unit
+        }
+        onKeyListener?.onKey(key.action)
+    }
+
+    // --- Accessibility node tree (spec §11.5) ---------------------------------------------------
+    //
+    // Without this, a Canvas-drawn grid is one blank rectangle to TalkBack: the user can tell a
+    // keyboard is present but cannot explore it, and every exploratory touch risks typing a
+    // character. The provider exposes each key as its own focusable, clickable node, so touch
+    // exploration reads keys aloud and activation requires an explicit double-tap.
+
+    private val accessibilityProvider by lazy {
+        KeyAccessibilityProvider(
+            host = this,
+            keyCount = { keys.size },
+            keyBounds = { id ->
+                keys.getOrNull(id)?.let { key ->
+                    android.graphics.Rect(
+                        key.rect.left.toInt(),
+                        key.rect.top.toInt(),
+                        key.rect.right.toInt(),
+                        key.rect.bottom.toInt()
+                    )
+                }
+            },
+            keyDescription = { id -> keys.getOrNull(id)?.let { describeKey(it) } },
+            onKeyActivated = { id ->
+                keys.getOrNull(id)?.let { key ->
+                    // Route through the same handler a real tap uses, so shift, layer switching and
+                    // haptics behave identically whether or not a screen reader is driving.
+                    handleKeyAction(key)
+                }
+            }
+        )
+    }
+
+    override fun getAccessibilityNodeProvider(): android.view.accessibility.AccessibilityNodeProvider =
+        accessibilityProvider
 
     private fun isAccessibilityActive(): Boolean {
         val am = context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
