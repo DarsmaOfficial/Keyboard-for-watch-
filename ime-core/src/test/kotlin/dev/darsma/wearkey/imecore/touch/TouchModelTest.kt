@@ -171,7 +171,7 @@ class TouchModelTest {
 
     @Test
     fun `invalid configuration is rejected at construction`() {
-        val bad = listOf(
+        val bad: List<() -> TouchModel.Config> = listOf(
             { TouchModel.Config(sigmaXFraction = 0f) },
             { TouchModel.Config(sigmaYFraction = -1f) },
             { TouchModel.Config(maxRadialDriftPx = -1f) },
