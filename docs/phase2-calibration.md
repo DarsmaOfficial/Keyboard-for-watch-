@@ -83,6 +83,28 @@ startup rather than steady-state.
 A clean measurement needs `KeyGridView`'s own `startFrameTiming()` / `frameStats()` instrumentation
 sampled during sustained typing. Until then this gate is **unproven, not passed**.
 
+## On-device calibration — pipeline verified
+
+`Settings → Калибровка касаний` runs a 25-target session and fits the drift constants from the
+recorded taps. Verified end to end on the watch by driving a synthetic session containing a
+*known* drift of 8.0 px with exponent 2.0:
+
+| Stage | Result |
+|---|---|
+| Target display | cyan dot on golden-angle spiral, radius ring, «осталось: 25» |
+| Fit | mean miss **3.1 px → 0.3 px**, reported as «Точнее на 92%» |
+| Recovered constants | drift **7.05 px**, exponent **1.75** |
+| Persistence | written to `wearkey_settings.xml` in device-protected storage |
+| Typing after apply | all 10 top-row keys correct; extreme edges (x = 6, x = 464) still correct |
+| Heap after apply | 2.92 MB, against the 8 MB gate |
+
+The recovered values sit slightly below the injected ones because `adb input` only accepts integer
+pixel coordinates, which truncates the small offsets near the display centre — precisely the
+samples that pin the exponent. A human finger has no such quantisation, so this understatement is
+an artifact of the test harness, not of the fitter.
+
+This validates the *plumbing*, not the constants. See below.
+
 ## Constants — still uncalibrated
 
 `TouchModel.Config` defaults remain the original estimates:
