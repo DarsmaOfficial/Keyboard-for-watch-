@@ -860,6 +860,16 @@ class KeyGridView @JvmOverloads constructor(
     override fun getAccessibilityNodeProvider(): android.view.accessibility.AccessibilityNodeProvider =
         accessibilityProvider
 
+    /**
+     * Hands touch-exploration hovers to the accessibility provider before the view sees them.
+     *
+     * Without this override the provider is inert for exploration: the framework finds no node to
+     * focus, the gesture reaches [onTouchEvent], and exploring a key types it. That was observed on
+     * the watch with TalkBack running before this was added.
+     */
+    override fun dispatchHoverEvent(event: MotionEvent): Boolean =
+        accessibilityProvider.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
+
     private fun isAccessibilityActive(): Boolean {
         val am = context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
         return am?.isEnabled == true && am.isTouchExplorationEnabled

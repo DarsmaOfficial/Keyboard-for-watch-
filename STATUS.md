@@ -27,7 +27,7 @@ never measured is not a gate that passed.
 | No `androidx.compose.*` in keyboard path | 0 | **0** | ✅ CI-enforced |
 | Permissions declared | 0 | **0** — not even `INTERNET` | ✅ verified |
 | Composed text always visible | 100% of fields | verified in browser URL bar | ⚠️ partial — full context matrix pending |
-| Frame time, 95th percentile | ≥ 95% under 16.6 ms | see §"Unproven" | ❌ **not proven** |
+| Frame time, 95th percentile | ≥ 95% under 16.6 ms | **p95 = 2.51 ms, 0.39% over budget** (259 frames) | ✅ verified |
 | Cold IME show | < 150 ms | never measured | ❌ **not measured** |
 | Text entry rate | ≥ 15 WPM | never measured | ❌ **not measured** |
 | Battery vs Gboard | no regression | never measured | ❌ **not measured** |
@@ -151,16 +151,38 @@ telemetry. The absence of `INTERNET` makes the offline claim kernel-enforced rat
 
 ---
 
+## Frame time — measured (spec §14)
+
+Sampled by timing `onDraw` directly during a real typing session: letters, suggestion updates,
+symbol-layer switches and backspaces.
+
+| Metric | Value |
+|---|---|
+| Frames sampled | 259 |
+| Median | **1.8 ms** |
+| p90 / p95 / p99 | 2.19 / **2.51** / 2.84 ms |
+| Worst | 66.03 ms — one frame, the first draw |
+| Over 16.6 ms | **0.39%** |
+| **Gate (≥ 95% under 16.6 ms)** | ✅ **PASS** |
+
+p95 sits about 6.6× inside budget. This also resolves the earlier three-way contradiction from
+`dumpsys gfxinfo`: its 26 ms p95 was cold-start contamination of a lifetime-cumulative counter, its
+legacy jank figure of 44.2% was simply wrong for this device, and its modern 0.45% counter was
+honest — it agrees with the 0.39% measured here.
+
+Getting this number required a fix, not just a run. The measurement existed but was unreachable:
+pressing *start* in Settings called through to the live key grid, which is necessarily null because
+an IME and a settings screen are never on screen together. The request is now latched so the next
+keyboard to appear begins recording, and percentiles are snapshotted when the keyboard is dismissed
+— otherwise leaving the field to read them is what destroys the view holding them.
+
+---
+
 ## Remaining work
 
 ### Unproven — measurement, not code
 
-1. **Frame time (§14).** `dumpsys gfxinfo` reports 95th percentile 26 ms, but that is cumulative
-   over the whole process lifetime including cold start. The modern jank counter says **0.45%**
-   while the legacy counter says **44.2%**, and GPU percentiles (4/7/7/8 ms) are comfortable — which
-   points at startup outliers rather than steady-state cost. A clean number needs `KeyGridView`'s
-   own `startFrameTiming()` / `frameStats()` sampled during sustained typing.
-2. **Cold IME show < 150 ms (§14).** Never measured.
+1. **Cold IME show < 150 ms (§14).** Never measured.
 3. **Context matrix (§14).** Verified in the browser URL bar only. The spec requires notification
    reply, WhatsApp, plain `EditText`, password field, number field and search field — these exercise
    genuinely different code paths.
@@ -177,10 +199,12 @@ telemetry. The absence of `INTERNET` makes the offline claim kernel-enforced rat
   the framework rather than `ExploreByTouchHelper`, whose POM pulls `androidx.core` (§12). Key
   activation was extracted into one path shared by finger and screen reader, so the two cannot
   drift. *Not yet verified with TalkBack running on the watch.*
-- **Frame-time instrumentation (§14)** — ✅ **built.** `onDraw` is timed directly into a fixed
-  4096-sample buffer, read from a settings screen. The previous implementation called `invalidate()`
-  every frame, which measured a synthetic 60 fps loop rather than the keyboard's real cost and burnt
-  battery doing it. *Numbers still need a real typing session.*
+- **Frame-time instrumentation (§14)** — ✅ **built and measured.** `onDraw` is timed directly into
+  a fixed 4096-sample buffer, read from a settings screen. The previous implementation called
+  `invalidate()` every frame, which measured a synthetic 60 fps loop rather than the keyboard's real
+  cost and burnt battery doing it. Real session: **p95 2.51 ms, 0.39% over budget, gate PASS** —
+  see the frame-time section above. Reaching it required fixing a lifecycle bug where the request
+  was dropped because no keyboard was showing when Settings issued it.
 - **State survival across process death (§11.5)** — ✅ **already satisfied; no code needed.** Every
   keystroke is committed to the `InputConnection` immediately, so the authoritative text lives in
   the host app's field and `onStartInputView` restores it via `getExtractedText`. Persisting typed
@@ -208,7 +232,9 @@ telemetry. The absence of `INTERNET` makes the offline claim kernel-enforced rat
 ## Suggested order
 
 1. **Frame timing instrumentation** — small, self-contained, closes the last Phase 2/3 gate.
-2. **TalkBack node hierarchy** — the most significant correctness gap, and accessibility work gets
+2. **Verify TalkBack on-device** — the node hierarchy is built but has never been driven by a real
+   screen reader; enabling TalkBack and exploring the grid is the only way to know it behaves. Was
+   the most significant correctness gap, and accessibility work gets
    harder the longer the view grows.
 3. **Context matrix** — cheap, and it tests the headline requirement in the places §4.5 says
    actually matter.
