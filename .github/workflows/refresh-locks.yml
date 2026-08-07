@@ -3,8 +3,8 @@ name: Refresh dependency locks
 # Regenerates Gradle lockfiles and commits them (spec §3.1).
 #
 # Locks cannot be generated in the development sandbox — it has no Android SDK and its JVM cannot
-# start under the PaX/W^X restriction — so this workflow is how they are produced. Run it after
-# any dependency change; the build workflow then verifies the locks are honoured.
+# start under the PaX/W^X restriction — so this workflow is how they are produced. Run it after any
+# dependency change; the build workflow then verifies the locks are honoured.
 
 on:
   workflow_dispatch:
@@ -34,7 +34,10 @@ jobs:
           ./gradlew resolveAndLockAll --write-locks --no-daemon --stacktrace
 
       - name: Show what was produced
-        run: find . -name 'gradle.lockfile' -not -path './.git/*' -exec sh -c 'echo "--- $1"; wc -l < "$1"' _ {} \;
+        run: |
+          find . -name 'gradle.lockfile' -not -path './.git/*' | while read -r f; do
+            echo "--- $f: $(wc -l < "$f") lines"
+          done
 
       - name: Commit lockfiles
         run: |
@@ -44,10 +47,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "lockfiles unchanged"
           else
-            git commit -m "Regenerate Gradle dependency lockfiles
-
-Produced by the refresh-locks workflow. Locks cannot be generated in the development sandbox: it
-has no Android SDK, and its JVM cannot start under the PaX/W^X restriction that blocks marking
-memory pages executable."
+            git commit -F .github/lockfile-commit-message.txt
             git push
           fi

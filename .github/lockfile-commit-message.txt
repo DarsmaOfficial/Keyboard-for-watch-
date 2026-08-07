@@ -1,0 +1,9 @@
+Regenerate Gradle dependency lockfiles
+
+Produced by the refresh-locks workflow. Lockfiles cannot be generated in the development sandbox:
+it has no Android SDK, and its JVM cannot start at all under the PaX/W^X restriction that blocks
+marking memory pages executable.
+
+Kept in a file rather than inline in the workflow because a multi-line -m argument inside a YAML
+run block breaks the document parse — GitHub then registers the workflow with no name and no
+triggers, and rejects every dispatch with "Workflow does not have 'workflow_dispatch' trigger".
