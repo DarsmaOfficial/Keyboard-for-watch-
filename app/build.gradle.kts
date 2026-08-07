@@ -8,6 +8,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         applicationId = "dev.darsma.wearkey"
         minSdk = 30
         targetSdk = 35
@@ -72,6 +73,11 @@ dependencies {
     implementation(project(":dict"))
     implementation(project(":engine-swipe"))
     testImplementation(kotlin("test"))
+
+    // Instrumented smoke test only (§9). These are androidTest-scoped, so they never enter the
+    // shipped APK — the §8.0 no-Compose gate inspects releaseRuntimeClasspath, which excludes them.
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 
     // Intentionally minimal for Phase 0: no Compose, no NDK, no INTERNET-requiring libs.
     // androidx.dynamicanimation is added in Phase 3 (motion) — not needed to draw a static grid.

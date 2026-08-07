@@ -41,6 +41,12 @@ jobs:
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
 
+      # The instrumented suite needs a device/emulator to RUN, which this runner does not have.
+      # Compiling it still catches the failures that matter in CI: a test referencing a hook that
+      # was renamed or removed. Running it is part of the on-device verification pass.
+      - name: Compile instrumented tests (spec §9)
+        run: ./gradlew :app:assembleDebugAndroidTest --stacktrace --no-daemon
+
       - name: Verify no arm64 libs and no androidx.compose deps in :app / :ui-wear (spec §8.0, §3 item 2)
         run: |
           ./gradlew :app:dependencies :ui-wear:dependencies --configuration releaseRuntimeClasspath > /tmp/deps.txt || true

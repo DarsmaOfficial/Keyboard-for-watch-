@@ -414,6 +414,31 @@ class WearKeyImeService : InputMethodService() {
         return super.onKeyDown(keyCode, event)
     }
 
+    // ---------------------------------------------------------------------------------------
+    // Test hooks (spec §9 instrumented smoke test)
+    //
+    // Deliberately minimal, and `internal` rather than public so nothing outside this module can
+    // reach them. No @VisibleForTesting annotation: it would mean adding androidx.annotation as a
+    // dependency purely for documentation, and the §12 rule is to justify every dependency. An IME
+    // cannot be bound by a test
+    // without making it the *selected* keyboard, which would change a system setting and leave the
+    // device altered after the run — so the test constructs the service directly and needs these
+    // three seams. They expose observation and context attachment only: no hook can put the service
+    // into a state that ordinary use could not also reach.
+    // ---------------------------------------------------------------------------------------
+
+    internal fun attachBaseContextForTest(context: android.content.Context) {
+        attachBaseContext(context)
+    }
+
+    /** The composed text as the user would see it — bullets, not plaintext, in masked fields. */
+    internal fun editorTextForTest(): String = editorState.text
+
+    /** Types through the same path a key press takes, so the test cannot bypass real logic. */
+    internal fun typeForTest(text: String) {
+        for (c in text) handleKey(KeyGridView.KeyAction.Character(c))
+    }
+
     private fun handleKey(action: KeyGridView.KeyAction) {
         val ic = currentInputConnection ?: return
         ic.beginBatchEdit()
