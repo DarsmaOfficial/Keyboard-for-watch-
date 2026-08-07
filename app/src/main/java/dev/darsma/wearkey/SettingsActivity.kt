@@ -92,6 +92,12 @@ class SettingsActivity : Activity() {
         // redistribution terms are not satisfied by a link, and a link would break the
         // no-network rule anyway.
         column.addView(
+            row(getString(R.string.settings_tutorial), null) {
+                startActivity(Intent(this, TutorialActivity::class.java))
+            }
+        )
+
+        column.addView(
             row(getString(R.string.settings_language_packs), null) {
                 startActivity(Intent(this, LanguagePacksActivity::class.java))
             }
@@ -108,6 +114,11 @@ class SettingsActivity : Activity() {
         )
 
         setContentView(scroll)
+
+        // Spec §11.5: the tutorial fires on first launch. Doing it from here rather than from the
+        // IME is deliberate — an InputMethodService that starts an Activity would steal focus from
+        // the field the user is trying to fill in.
+        TutorialActivity.launchIfFirstRun(this)
     }
 
     private fun updateHapticLabel(prefs: SettingsStore) {

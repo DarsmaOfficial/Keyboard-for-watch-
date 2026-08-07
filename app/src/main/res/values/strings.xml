@@ -64,4 +64,19 @@
     <string name="packs_import_invalid">That file is not a valid dictionary index</string>
     <string name="packs_import_ok">Imported %1$s</string>
     <string name="settings_language_packs">Language packs</string>
+    <string name="tutorial_title">How to type</string>
+    <string name="tutorial_next">Next</string>
+    <string name="tutorial_done">Start typing</string>
+    <string name="tutorial_skip">Skip</string>
+    <string name="tutorial_swipe_title">Glide to type</string>
+    <string name="tutorial_swipe_body">Drag across the letters without lifting your finger. Lift to commit the word. Other guesses appear above the keys.</string>
+    <string name="tutorial_strip_title">The text strip</string>
+    <string name="tutorial_strip_body">The row above the keys shows what you have typed. Tap anywhere in it to move the cursor there.</string>
+    <string name="tutorial_longpress_title">Accents and symbols</string>
+    <string name="tutorial_longpress_body">Hold a letter for accented versions. The ?123 key opens numbers and symbols.</string>
+    <string name="tutorial_language_title">Two languages</string>
+    <string name="tutorial_language_body">The globe key switches between English and Russian. Corrections follow the language you are typing.</string>
+    <string name="tutorial_privacy_title">Nothing leaves the watch</string>
+    <string name="tutorial_privacy_body">No internet permission, no microphone, no analytics. Everything runs on the device.</string>
+    <string name="settings_tutorial">How to type</string>
 </resources>

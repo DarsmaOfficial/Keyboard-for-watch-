@@ -62,4 +62,19 @@
     <string name="packs_import_invalid">Это не словарный индекс</string>
     <string name="packs_import_ok">Импортирован %1$s</string>
     <string name="settings_language_packs">Языковые пакеты</string>
+    <string name="tutorial_title">Как печатать</string>
+    <string name="tutorial_next">Далее</string>
+    <string name="tutorial_done">Начать</string>
+    <string name="tutorial_skip">Пропустить</string>
+    <string name="tutorial_swipe_title">Ввод свайпом</string>
+    <string name="tutorial_swipe_body">Проведите пальцем по буквам, не отрывая его. Отпустите — слово введёно. Другие варианты появятся над клавишами.</string>
+    <string name="tutorial_strip_title">Строка текста</string>
+    <string name="tutorial_strip_body">Строка над клавишами показывает набранное. Нажмите в любом месте, чтобы переместить курсор.</string>
+    <string name="tutorial_longpress_title">Знаки и символы</string>
+    <string name="tutorial_longpress_body">Удерживайте букву для вариантов с диакритикой. Клавиша ?123 открывает цифры и символы.</string>
+    <string name="tutorial_language_title">Два языка</string>
+    <string name="tutorial_language_body">Клавиша языка переключает русский и английский. Исправления следуют за языком.</string>
+    <string name="tutorial_privacy_title">Ничего не покидает часы</string>
+    <string name="tutorial_privacy_body">Нет доступа в интернет, микрофона и аналитики. Всё работает на устройстве.</string>
+    <string name="settings_tutorial">Как печатать</string>
 </resources>

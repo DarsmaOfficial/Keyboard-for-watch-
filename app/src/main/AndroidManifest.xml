@@ -83,6 +83,13 @@
           Language packs (§4.3). Not exported: reached only from Settings. Exporting it would let
           any app open a screen whose import action writes into our private storage.
         -->
+        <!-- First-run tutorial (§11.5). Not exported; launched from Settings on first run. -->
+        <activity
+            android:name=".TutorialActivity"
+            android:exported="false"
+            android:label="@string/tutorial_title"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
         <activity
             android:name=".LanguagePacksActivity"
             android:exported="false"
