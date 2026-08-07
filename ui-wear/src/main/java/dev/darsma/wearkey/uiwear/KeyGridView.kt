@@ -314,6 +314,37 @@ class KeyGridView @JvmOverloads constructor(
         style = Paint.Style.FILL
     }
 
+    /**
+     * Active colour scheme (spec §11 v0.3).
+     *
+     * Setting it repaints every paint object in place rather than allocating new ones — the grid is
+     * redrawn on every frame while typing, and swapping Paint instances mid-animation would be a
+     * per-frame allocation for a value that changes at most once per session.
+     */
+    var theme: KeyboardTheme = KeyboardTheme.MIDNIGHT
+        set(value) {
+            if (field == value) return
+            field = value
+            applyTheme()
+            invalidate()
+        }
+
+    private fun applyTheme() {
+        backgroundPaint.color = theme.background
+        keyPaint.color = theme.letterKey
+        keyPressedPaint.color = theme.pressedKey
+        keyActivePaint.color = theme.functionKey
+        keyAccentPaint.color = theme.accent
+        labelPaint.color = theme.label
+        trailPaint.color = theme.accent
+
+        // High contrast defines keys by outline rather than fill (see KeyboardTheme). A width of 0
+        // would still paint a hairline, so the stroke is disabled by colour instead.
+        keyBorderPaint.color = if (theme.keyStrokeDp > 0f) theme.keyStroke else theme.functionKey
+        keyBorderPaint.strokeWidth =
+            if (theme.keyStrokeDp > 0f) theme.keyStrokeDp * resources.displayMetrics.density else 2f
+    }
+
     // --- Frame-time instrumentation (spec §14 gate: ≥95% of frames under 16.6 ms) --------------
     //
     // The earlier version of this called invalidate() from its own Choreographer callback, which
@@ -679,10 +710,12 @@ class KeyGridView @JvmOverloads constructor(
             canvas.drawRoundRect(key.rect, radius, radius, paint)
             canvas.drawRoundRect(key.rect, radius, radius, keyBorderPaint)
 
+            // On a caps-lock key the fill is the accent colour, so the label must invert to stay
+            // readable — a white glyph on cyan or yellow is close to illegible at watch size.
             val labelColor = if (shiftActive && shiftState == ShiftState.CAPS_LOCK) {
-                Color.BLACK
+                theme.background
             } else {
-                Color.WHITE
+                theme.label
             }
             labelPaint.color = labelColor
 
@@ -705,7 +738,7 @@ class KeyGridView @JvmOverloads constructor(
                 labelPaint
             )
             labelPaint.textSize = baseSize
-            labelPaint.color = Color.WHITE
+            labelPaint.color = theme.label
 
             if (scaled) canvas.restore()
         }

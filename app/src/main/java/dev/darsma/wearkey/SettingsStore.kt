@@ -24,6 +24,11 @@ class SettingsStore(context: Context) {
         get() = prefs.getFloat(KEY_HAPTIC_INTENSITY, 1f)
         set(value) = prefs.edit().putFloat(KEY_HAPTIC_INTENSITY, value.coerceIn(0f, 1f)).apply()
 
+    /** Selected keyboard theme id (spec §11 v0.3); null means the default. */
+    var themeId: String?
+        get() = prefs.getString(KEY_THEME, null)
+        set(value) = prefs.edit().putString(KEY_THEME, value).apply()
+
     /** True once the first-run tutorial has been completed or skipped (spec §11.5). */
     fun hasSeenTutorial(): Boolean = prefs.getBoolean(KEY_TUTORIAL_SEEN, false)
 
@@ -103,6 +108,7 @@ class SettingsStore(context: Context) {
         private const val KEY_HAPTIC_INTENSITY = "haptic_intensity"
         private const val KEY_LAST_CLEAR = "last_clear_ms"
         private const val KEY_TUTORIAL_SEEN = "tutorial_seen"
+        private const val KEY_THEME = "theme_id"
         private const val KEY_DRIFT_PX = "touch_drift_px"
         private const val KEY_DRIFT_EXPONENT = "touch_drift_exponent"
         private const val KEY_PENDING_DRIFT_PX = "pending_drift_px"
