@@ -263,12 +263,19 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
 - **First-run tutorial (§11.5)** — five cards, launched once from Settings, re-openable there.
 - **Instrumented IME lifecycle smoke test (§9)** — 6 tests. CI compiles them; running them needs a
   device, so that belongs to the on-device pass.
+- **Release signing (§13)** — ✅ **verified end to end, not merely configured.** A real signed
+  release (`v0.3.0-rc1`) was built and published: RSA-4096 / SHA-384 PKCS12 key, certificate
+  fingerprint pinned in the workflow and confirmed matching, published checksum verified against an
+  independently downloaded copy, and all §3 gates re-checked on the *published* artifact rather
+  than a local build. Keystore lives outside the repo tree; see `RELEASING.md`.
 
 ### Not started — code
 
 1. **Spatial prediction, eyes-free mode (§7.2b).** R&D, explicitly optional, never default.
 2. **Themes (§11 v0.3).** The emoji half of this line item is done; themes are not.
-3. **Release signing + reproducible offline build (§13, §3.1).** No release keystore yet, and the
+3. **Reproducible offline build (§3.1).** The "builds offline from a clean machine" claim still
+   needs dependency locking and checksums to be a fact rather than an aspiration. *Release signing
+   is now done* — see below. No release keystore yet, and the
    "builds offline from a clean machine" claim needs dependency locking and checksums to be a fact
    rather than an aspiration.
 
