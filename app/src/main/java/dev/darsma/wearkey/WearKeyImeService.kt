@@ -37,17 +37,6 @@ class WearKeyImeService : InputMethodService() {
     private val spellEngine = SpellEngine()
     private val swipeController = SwipeController(spellEngine)
     private val emojiRecentsStore by lazy { EmojiRecentsStore(this) }
-
-    /**
-     * Cold-show instrumentation (spec §14 gate: < 150 ms).
-     *
-     * Logged rather than surfaced in the UI because the measurement must span *process creation to
-     * first visible frame*, and by the time any in-app timer could report a result the interesting
-     * part is already over. Two log lines cost nothing measurable and are the only way to observe
-     * the framework's own sequence from outside.
-     */
-    private var serviceCreatedNanos = 0L
-    private var coldShowReported = false
     private val dictionaryLoader by lazy { DictionaryLoader(this, spellEngine) }
 
     /**
@@ -58,8 +47,6 @@ class WearKeyImeService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
-        serviceCreatedNanos = System.nanoTime()
-        android.util.Log.i("WearKeyPerf", "serviceCreate")
         // Restore encrypted history once, up front (spec §6: history survives process death).
         clipboardPersistence.load(clipboardStore)
         // Persist on every change so a kill by memory pressure never loses entries.
@@ -357,21 +344,6 @@ class WearKeyImeService : InputMethodService() {
         // Re-read on every field so a theme change in Settings takes effect at the next keyboard
         // show, without needing the IME to be restarted.
         surfaceView?.keyGrid?.theme = KeyboardTheme.byId(SettingsStore(this).themeId)
-
-        // Report the cold path once per process. Reporting every show would measure warm shows,
-        // which are a different and far less interesting number.
-        if (!coldShowReported) {
-            coldShowReported = true
-            val view = surfaceView
-            if (view != null) {
-                // Post to the view's own message queue so the timestamp lands after layout and
-                // the first draw are actually scheduled, not merely requested.
-                view.post {
-                    val ms = (System.nanoTime() - serviceCreatedNanos) / 1_000_000.0
-                    android.util.Log.i("WearKeyPerf", "inputViewShown ms=%.1f".format(ms))
-                }
-            }
-        }
 
         // Clipboard reads are only legal while the IME holds focus (spec §6) — do it here.
         captureSystemClipboard(info)
