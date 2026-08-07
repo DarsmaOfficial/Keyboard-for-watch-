@@ -20,8 +20,15 @@ subprojects {
         lockAllConfigurations()
     }
 
-    // A single task that resolves every lockable configuration, so `--write-locks` has something to
+    // A single task that resolves the lockable configurations, so `--write-locks` has something to
     // walk. Without it each configuration would have to be resolved by hand to refresh the locks.
+    //
+    // Only *runtime and compile classpaths* are resolved, and androidTest ones are excluded.
+    // Resolving every resolvable configuration fails: the androidTest classpaths depend on the app
+    // project itself, and outside a real build Gradle cannot choose between its variants
+    // ("cannot choose between the following variants of project :app"). Those configurations carry
+    // no external coordinate that is not already locked through the main classpaths, so skipping
+    // them costs no coverage.
     tasks.register("resolveAndLockAll") {
         notCompatibleWithConfigurationCache("Resolves configurations at execution time by design")
         doFirst {
@@ -30,7 +37,11 @@ subprojects {
             }
         }
         doLast {
-            configurations.filter { it.isCanBeResolved }.forEach { it.resolve() }
+            configurations
+                .filter { it.isCanBeResolved }
+                .filter { it.name.endsWith("CompileClasspath") || it.name.endsWith("RuntimeClasspath") }
+                .filterNot { it.name.contains("AndroidTest", ignoreCase = true) }
+                .forEach { it.resolve() }
         }
     }
 }
