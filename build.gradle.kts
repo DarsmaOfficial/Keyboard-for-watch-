@@ -41,7 +41,15 @@ subprojects {
                 .filter { it.isCanBeResolved }
                 .filter { it.name.endsWith("CompileClasspath") || it.name.endsWith("RuntimeClasspath") }
                 .filterNot { it.name.contains("AndroidTest", ignoreCase = true) }
-                .forEach { it.resolve() }
+                .forEach {
+                    // resolutionResult walks the dependency *graph*, which is all locking records.
+                    // `resolve()` instead demands the artifact *files*, and that forces variant
+                    // selection on every project dependency — which fails outside a real build with
+                    // "cannot choose between the following variants of project :ui-wear", because
+                    // nothing has told Gradle whether it wants classes, a jar, or data-binding
+                    // symbols. The graph is unambiguous; only the artifacts are not.
+                    it.incoming.resolutionResult.root
+                }
         }
     }
 }
