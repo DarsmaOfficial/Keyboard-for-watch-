@@ -263,6 +263,13 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
 - **First-run tutorial (§11.5)** — five cards, launched once from Settings, re-openable there.
 - **Instrumented IME lifecycle smoke test (§9)** — 6 tests. CI compiles them; running them needs a
   device, so that belongs to the on-device pass.
+- **Reproducible offline build (§3.1)** — ✅ **verified by tampering, not assumed.** Version
+  catalogue (`gradle/libs.versions.toml`), six lockfiles pinning 96 coordinates including
+  transitives, and the Gradle distribution SHA-256 — which was genuinely missing until now, so the
+  wrapper would have run whatever it downloaded. Locking was proven real by changing a pinned
+  version to one that does not exist: CI failed with *"Did not resolve … which is part of the
+  dependency lock state"*. `OFFLINE_BUILD.md` documents the mirror procedure and the `--offline`
+  check.
 - **Release signing (§13)** — ✅ **verified end to end, not merely configured.** A real signed
   release (`v0.3.0-rc1`) was built and published: RSA-4096 / SHA-384 PKCS12 key, certificate
   fingerprint pinned in the workflow and confirmed matching, published checksum verified against an
@@ -273,9 +280,7 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
 
 1. **Spatial prediction, eyes-free mode (§7.2b).** R&D, explicitly optional, never default.
 2. **Themes (§11 v0.3).** The emoji half of this line item is done; themes are not.
-3. **Reproducible offline build (§3.1).** The "builds offline from a clean machine" claim still
-   needs dependency locking and checksums to be a fact rather than an aspiration. *Release signing
-   is now done* — see below. No release keystore yet, and the
+*(Release signing and the offline/reproducible build are both done — see the verified list below.)* No release keystore yet, and the
    "builds offline from a clean machine" claim needs dependency locking and checksums to be a fact
    rather than an aspiration.
 
