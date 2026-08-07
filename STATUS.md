@@ -205,9 +205,13 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
   `hqb`. This is exactly the failure §11.5 names, and it makes the keyboard unusable with a screen
   reader, because the only way to identify a key is to type it.
 
-  A control test proved the harness was sound: the same single `adb input tap` on an ordinary
-  settings row only moved TalkBack's focus ring without activating the row. So exploration works on
-  normal views and the keyboard genuinely bypasses it.
+  **The control test was weaker than first claimed, and the correction matters.** It was recorded
+  as proving the harness sound: a single `adb input tap` on a settings row moved TalkBack's focus
+  ring without activating the row. But the same screenshot shows the row's value had *changed* —
+  the tap moved focus **and** activated. So `adb shell input tap` does not reliably reproduce touch
+  exploration, and the keyboard result it produced cannot be trusted either way. The bug may be
+  real or may be an artefact of injected input bypassing `TouchExplorer`; on the current evidence
+  that is genuinely undetermined, and the earlier "definitive" framing was wrong.
 
   Three fixes attempted so far, each addressing a real defect but none sufficient:
   1. `dispatchHoverEvent` routing — the provider had no hover handling at all, so exploration
@@ -217,11 +221,22 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
   3. Removing the `contentDescription` added in (2) — a labelled view is treated as a leaf, so the
      framework stops descending and never asks for the virtual children.
 
-  The framework's own diagnostic is the thing to trust here: `dumpsys accessibility` shows the IME
-  window present at correct bounds with **`hasChildren=false`** — present, sized, empty. Until that
-  reads true, the node tree is not reachable, whatever the source says.
+  **`hasChildren=false` was also over-read.** In `AccessibilityWindowInfo` that field reports child
+  *windows*, not child nodes — an IME window legitimately has none, so it is not the signal it was
+  treated as. `uiautomator dump` returning nothing likewise proves little: it excludes IME windows
+  by design, which is already documented in the gotchas below.
 
-  *Verification of fix (3) is incomplete — the watch went on charge mid-test.*
+  So of the three "diagnostics" used, one was misread, one was inapplicable, and the control was
+  invalid. The three code changes are still defensible on their own merits — a provider with no
+  hover routing genuinely cannot support exploration, and an AUTO-importance Canvas view genuinely
+  is dropped from the tree — but none of them has been *shown* to fix anything.
+
+  **How to test this properly** (needs TalkBack on, so it needs the user's agreement):
+  1. Enable TalkBack, then explore with a **real finger**, not `adb input tap`.
+  2. Read the node tree with `dumpsys accessibility a11ycache` or an
+     `AccessibilityService`-based dump, which unlike `uiautomator` can see IME windows.
+  3. The pass condition is that a finger resting on a key announces it and leaves the field
+     unchanged; activation happens only on double-tap.
 - **Frame-time instrumentation (§14)** — ✅ **built and measured.** `onDraw` is timed directly into
   a fixed 4096-sample buffer, read from a settings screen. The previous implementation called
   `invalidate()` every frame, which measured a synthetic 60 fps loop rather than the keyboard's real
