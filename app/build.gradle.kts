@@ -22,12 +22,30 @@ android {
     // a local debug build — the release build type simply stays unsigned.
     val keystorePath = System.getenv("WEARKEY_KEYSTORE")
     signingConfigs {
-        if (!keystorePath.isNullOrBlank() && file(keystorePath).exists()) {
+        if (!keystorePath.isNullOrBlank()) {
+            // Fail loudly on a *partial* configuration. The original guard silently skipped signing
+            // whenever the file was missing, which meant a typo in the path produced an unsigned
+            // release APK that looks perfectly normal until it will not install over the previous
+            // version. If the operator asked for signing, they must get signing or an error.
+            require(file(keystorePath).exists()) {
+                "WEARKEY_KEYSTORE is set but no file exists at: $keystorePath"
+            }
+            val storePw = System.getenv("WEARKEY_KEYSTORE_PASSWORD")
+            val alias = System.getenv("WEARKEY_KEY_ALIAS")
+            val keyPw = System.getenv("WEARKEY_KEY_PASSWORD")
+            require(!storePw.isNullOrBlank()) { "WEARKEY_KEYSTORE_PASSWORD is not set" }
+            require(!alias.isNullOrBlank()) { "WEARKEY_KEY_ALIAS is not set" }
+            require(!keyPw.isNullOrBlank()) { "WEARKEY_KEY_PASSWORD is not set" }
+
             create("release") {
                 storeFile = file(keystorePath)
-                storePassword = System.getenv("WEARKEY_KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("WEARKEY_KEY_ALIAS")
-                keyPassword = System.getenv("WEARKEY_KEY_PASSWORD")
+                storePassword = storePw
+                keyAlias = alias
+                keyPassword = keyPw
+                // The keystore is PKCS12 (the modern default; JKS is deprecated). Naming it
+                // explicitly stops Gradle guessing from the file extension, which is .jks here for
+                // historical reasons even though the container is PKCS12.
+                storeType = "pkcs12"
             }
         }
     }
