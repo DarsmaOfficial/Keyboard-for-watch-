@@ -125,7 +125,7 @@ geometry. Real values need a human session — one minute, via *Settings → К�
 | `:clipboard` | separate module | ⚠️ implemented inside `:ime-core`/`:app` instead |
 | `:engine-swipe` | DTW path matching | ⚠️ built, 9 tests — not verified on-device |
 
-**Test coverage: 114 unit tests across six modules**, all passing in CI.
+**Test coverage: 123 unit tests across five modules, plus 6 instrumented tests**, all passing in CI (the instrumented suite is compiled, not run — no device on the runner).
 
 `:app` unit tests were added to the CI task list at the same time as the language-pack tests — they had been committed but never executed, since the task list named only four modules. A test that does not run is worse than none, because it reads as coverage.
 
@@ -258,14 +258,17 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
 - **Installable language packs (§4.3)** — signature-checked pack discovery, offline file import,
   Settings screen. 6 unit tests. Each future pack still needs its own licence audit; roughly half
   of common European languages are copyleft and cannot ship.
+- **Emoji layer (§11 v0.3)** — scrolling categorised grid, recents, platform `NotoColorEmoji.ttf`
+  with no bundled font. 9 unit tests.
+- **First-run tutorial (§11.5)** — five cards, launched once from Settings, re-openable there.
+- **Instrumented IME lifecycle smoke test (§9)** — 6 tests. CI compiles them; running them needs a
+  device, so that belongs to the on-device pass.
 
 ### Not started — code
 
 1. **Spatial prediction, eyes-free mode (§7.2b).** R&D, explicitly optional, never default.
-2. **Emoji layer and themes (§11 v0.3).**
-3. **Instrumented IME lifecycle smoke test (§9).** Zero `androidTest` sources exist.
-4. **First-run tutorial (§11.5).**
-5. **Release signing + reproducible offline build (§13, §3.1).** No release keystore yet, and the
+2. **Themes (§11 v0.3).** The emoji half of this line item is done; themes are not.
+3. **Release signing + reproducible offline build (§13, §3.1).** No release keystore yet, and the
    "builds offline from a clean machine" claim needs dependency locking and checksums to be a fact
    rather than an aspiration.
 
