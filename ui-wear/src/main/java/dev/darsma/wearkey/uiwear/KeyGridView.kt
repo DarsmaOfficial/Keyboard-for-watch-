@@ -43,6 +43,8 @@ class KeyGridView @JvmOverloads constructor(
         object SwitchLanguage : KeyAction()
         /** Opens the clipboard history panel (spec §6). */
         object Clipboard : KeyAction()
+        /** Opens the emoji layer (spec §11 v0.3). */
+        object Emoji : KeyAction()
         /** Cycles OFF -> SHIFTED -> CAPS_LOCK -> OFF. */
         object Shift : KeyAction()
         /** Toggles between the letter layer and the symbol/number layer. */
@@ -535,13 +537,17 @@ class KeyGridView @JvmOverloads constructor(
         val funcRight = (circleCenterX + funcHalfChord).coerceAtMost(width.toFloat()) - KEY_EDGE_INSET_PX
         val funcWidth = (funcRight - funcLeft).coerceAtLeast(1f)
 
-        // Only five keys here now — shift and backspace moved up into the bottom letter row —
-        // so the spacebar gets nearly half the row and is comfortably hittable.
-        val symbolWidth = funcWidth * 0.16f
-        val switchLangWidth = funcWidth * 0.14f
-        val clipboardWidth = funcWidth * 0.13f
-        val enterWidth = funcWidth * 0.19f
-        val spaceWidth = funcWidth - symbolWidth - switchLangWidth - clipboardWidth - enterWidth
+        // Six keys: shift and backspace live in the bottom letter row, so the spacebar still takes
+        // roughly a third of the row. At a 466 px width that leaves ~53 px per function key —
+        // wider than a letter key (~44 px) — and ~136 px of spacebar, so adding emoji did not cost
+        // anything in hittability.
+        val symbolWidth = funcWidth * 0.15f
+        val switchLangWidth = funcWidth * 0.13f
+        val clipboardWidth = funcWidth * 0.12f
+        val emojiWidth = funcWidth * 0.12f
+        val enterWidth = funcWidth * 0.17f
+        val spaceWidth =
+            funcWidth - symbolWidth - switchLangWidth - clipboardWidth - emojiWidth - enterWidth
 
         var x = funcLeft
         keys.add(
@@ -564,6 +570,11 @@ class KeyGridView @JvmOverloads constructor(
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + clipboardWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
         )
         x += clipboardWidth
+        keys.add(
+            Key(KeyAction.Emoji, "☺",
+                RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, x + emojiWidth - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
+        )
+        x += emojiWidth
         keys.add(
             Key(KeyAction.Enter, actionLabel ?: "⏎",
                 RectF(x + KEY_GAP_PX, funcTop + KEY_GAP_PX, funcRight - KEY_GAP_PX, funcBottom - KEY_GAP_PX))
@@ -924,6 +935,7 @@ class KeyGridView @JvmOverloads constructor(
         KeyAction.Enter -> actionLabel ?: context.getString(R.string.a11y_enter)
         KeyAction.SwitchLanguage -> context.getString(R.string.a11y_switch_language)
         KeyAction.Clipboard -> context.getString(R.string.a11y_clipboard)
+        KeyAction.Emoji -> context.getString(R.string.a11y_emoji_key)
         KeyAction.SymbolLayer ->
             if (symbolLayerVisible) context.getString(R.string.a11y_letters)
             else context.getString(R.string.a11y_symbols)
@@ -971,6 +983,7 @@ class KeyGridView @JvmOverloads constructor(
                 KeyAction.SymbolLayer,
                 KeyAction.SwitchLanguage,
                 KeyAction.Clipboard -> HapticFeedback.Feedback.SPACE_OR_LAYER
+                KeyAction.Emoji -> HapticFeedback.Feedback.SPACE_OR_LAYER
                 is KeyAction.Character -> HapticFeedback.Feedback.KEY_TAP
             }
         )

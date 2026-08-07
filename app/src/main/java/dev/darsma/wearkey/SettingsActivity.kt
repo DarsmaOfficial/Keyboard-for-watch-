@@ -64,6 +64,9 @@ class SettingsActivity : Activity() {
             row(getString(R.string.settings_clear_data), null) {
                 EncryptedClipboardPersistence(this).clear()
                 SettingsStore(this).markClipboardClearRequested()
+                // Emoji recents are usage history too. "Clear data" that left them behind would
+                // be a false promise, and the user has no other way to reach them.
+                EmojiRecentsStore(this).clear()
                 toast(getString(R.string.settings_cleared))
             }
         )

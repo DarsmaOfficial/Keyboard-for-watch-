@@ -21,4 +21,15 @@
     <!-- Touch calibration (spec §7.1). %1$d is how many targets are left to tap. -->
     <string name="calibration_remaining">%1$d left</string>
     <string name="a11y_keyboard">Keyboard</string>
+    <string name="emoji_category_recent">Recent</string>
+    <string name="emoji_category_smileys">Smileys</string>
+    <string name="emoji_category_gestures">Gestures</string>
+    <string name="emoji_category_hearts">Hearts</string>
+    <string name="emoji_category_animals">Animals</string>
+    <string name="emoji_category_food">Food</string>
+    <string name="emoji_category_activity">Activity</string>
+    <string name="emoji_category_travel">Travel</string>
+    <string name="emoji_category_objects">Objects</string>
+    <string name="emoji_category_symbols">Symbols</string>
+    <string name="a11y_emoji_key">Emoji</string>
 </resources>

@@ -21,4 +21,15 @@
     <!-- Калибровка касаний (спец. §7.1). %1$d — сколько целей осталось. -->
     <string name="calibration_remaining">осталось: %1$d</string>
     <string name="a11y_keyboard">Клавиатура</string>
+    <string name="emoji_category_recent">Недавние</string>
+    <string name="emoji_category_smileys">Смайлики</string>
+    <string name="emoji_category_gestures">Жесты</string>
+    <string name="emoji_category_hearts">Сердца</string>
+    <string name="emoji_category_animals">Животные</string>
+    <string name="emoji_category_food">Еда</string>
+    <string name="emoji_category_activity">Активность</string>
+    <string name="emoji_category_travel">Путешествия</string>
+    <string name="emoji_category_objects">Предметы</string>
+    <string name="emoji_category_symbols">Символы</string>
+    <string name="a11y_emoji_key">Эмодзи</string>
 </resources>

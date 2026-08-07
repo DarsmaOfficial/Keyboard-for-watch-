@@ -9,6 +9,7 @@ import dev.darsma.wearkey.dict.SpellEngine
 import dev.darsma.wearkey.imecore.ClipboardStore
 import dev.darsma.wearkey.imecore.EditorState
 import dev.darsma.wearkey.uiwear.ClipboardPanelView
+import dev.darsma.wearkey.uiwear.EmojiPanelView
 import dev.darsma.wearkey.uiwear.HapticFeedback
 import dev.darsma.wearkey.uiwear.KeyGridView
 import dev.darsma.wearkey.uiwear.KeyboardSurfaceView
@@ -34,6 +35,7 @@ class WearKeyImeService : InputMethodService() {
 
     private val spellEngine = SpellEngine()
     private val swipeController = SwipeController(spellEngine)
+    private val emojiRecentsStore by lazy { EmojiRecentsStore(this) }
     private val dictionaryLoader by lazy { DictionaryLoader(this, spellEngine) }
 
     /**
@@ -161,6 +163,34 @@ class WearKeyImeService : InputMethodService() {
         surfaceView?.suggestionStrip?.setSuggestions(candidates.drop(1))
     }
 
+    /**
+     * Commits an emoji and records it as recent (spec §11 v0.3).
+     *
+     * The panel stays open: emoji are usually sent in twos and threes, and closing after each one
+     * would force a round trip through the emoji key every time.
+     *
+     * Recents are usage data about the user's messages, so they follow the clipboard rule (§11.5)
+     * and are not recorded in password or no-personalised-learning fields. The emoji is still
+     * *committed* there — refusing to type would be absurd — only the learning is suppressed.
+     */
+    private fun commitEmoji(emoji: String) {
+        val ic = currentInputConnection ?: return
+        ic.beginBatchEdit()
+        try {
+            editorState.commitText(emoji)
+            ic.commitText(emoji, 1)
+        } finally {
+            ic.endBatchEdit()
+        }
+
+        if (!suggestionsDisabled) {
+            surfaceView?.emojiPanel?.let { panel ->
+                panel.noteUsed(emoji)
+                emojiRecentsStore.save(panel.recentsSnapshot())
+            }
+        }
+    }
+
     override fun onCreateInputView(): View {
         val view = KeyboardSurfaceView(this)
         view.bind(editorState)
@@ -194,6 +224,11 @@ class WearKeyImeService : InputMethodService() {
                 view.hideClipboard()
             }
         }
+        view.emojiPanel.restoreRecents(emojiRecentsStore.load())
+        view.emojiPanel.onEmojiListener = EmojiPanelView.OnEmojiListener { emoji ->
+            commitEmoji(emoji)
+        }
+
         view.suggestionStrip.onSuggestionListener =
             SuggestionStripView.OnSuggestionListener { word -> replaceCurrentWord(word) }
 
@@ -431,6 +466,7 @@ class WearKeyImeService : InputMethodService() {
                     captureSystemClipboard(currentInputEditorInfo)
                     surfaceView?.toggleClipboard()
                 }
+                KeyGridView.KeyAction.Emoji -> surfaceView?.toggleEmoji()
             }
         } finally {
             ic.endBatchEdit()

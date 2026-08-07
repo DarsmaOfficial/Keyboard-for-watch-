@@ -95,6 +95,7 @@ class LaunchKeyboardActivity : Activity() {
             KeyGridView.KeyAction.Backspace -> editorState.backspace()
             KeyGridView.KeyAction.Enter -> commitAndFinish()
             KeyGridView.KeyAction.Clipboard -> surfaceView?.toggleClipboard()
+            KeyGridView.KeyAction.Emoji -> surfaceView?.toggleEmoji()
             // Owned by KeyGridView itself; listed for exhaustiveness.
             KeyGridView.KeyAction.Shift,
             KeyGridView.KeyAction.SymbolLayer -> Unit

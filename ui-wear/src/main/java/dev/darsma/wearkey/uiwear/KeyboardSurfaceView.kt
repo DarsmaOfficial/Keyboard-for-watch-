@@ -32,6 +32,7 @@ class KeyboardSurfaceView @JvmOverloads constructor(
     val suggestionStrip: SuggestionStripView
     val keyGrid: KeyGridView
     val clipboardPanel: ClipboardPanelView
+    val emojiPanel: EmojiPanelView
 
     init {
         setBackgroundColor(Color.BLACK)
@@ -70,6 +71,14 @@ class KeyboardSurfaceView @JvmOverloads constructor(
             visibility = GONE
         }
         addView(clipboardPanel)
+
+        // Same slot again, same reason: the emoji grid needs the full key area to show glyphs at a
+        // tappable size, so it replaces the keys rather than sharing space with them.
+        emojiPanel = EmojiPanelView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
+            visibility = GONE
+        }
+        addView(emojiPanel)
     }
 
     /** Wires both sub-views to the given state in one call — keeps entry points' code trivial. */
@@ -91,6 +100,10 @@ class KeyboardSurfaceView @JvmOverloads constructor(
 
     fun showClipboard() {
         clipboardPanel.refresh()
+        // Symmetric with showEmoji: exactly one panel may occupy the key slot. Opening the
+        // clipboard from the emoji layer previously left both VISIBLE, and which one the user saw
+        // depended on child order rather than on intent.
+        emojiPanel.visibility = GONE
         keyGrid.visibility = GONE
         clipboardPanel.visibility = VISIBLE
     }
@@ -102,6 +115,27 @@ class KeyboardSurfaceView @JvmOverloads constructor(
 
     fun toggleClipboard() {
         if (isClipboardOpen) hideClipboard() else showClipboard()
+    }
+
+    /** True while the emoji layer is showing instead of the key grid. */
+    val isEmojiOpen: Boolean
+        get() = emojiPanel.visibility == VISIBLE
+
+    fun showEmoji() {
+        // Closing the clipboard first keeps the invariant that exactly one panel occupies the slot;
+        // without it both could be VISIBLE and the later child would silently win.
+        clipboardPanel.visibility = GONE
+        keyGrid.visibility = GONE
+        emojiPanel.visibility = VISIBLE
+    }
+
+    fun hideEmoji() {
+        emojiPanel.visibility = GONE
+        keyGrid.visibility = VISIBLE
+    }
+
+    fun toggleEmoji() {
+        if (isEmojiOpen) hideEmoji() else showEmoji()
     }
 
     /**
