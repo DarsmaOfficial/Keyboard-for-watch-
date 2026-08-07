@@ -263,6 +263,11 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
 - **First-run tutorial (§11.5)** — five cards, launched once from Settings, re-openable there.
 - **Instrumented IME lifecycle smoke test (§9)** — 6 tests. CI compiles them; running them needs a
   device, so that belongs to the on-device pass.
+- **Themes (§11 v0.3)** — Midnight / High contrast / Amber, all AMOLED-black by test. Contrast
+  verified with WCAG relative luminance rather than by eye; high contrast uses outlines, not white
+  fills, because a large static bright region is what §8 warns against.
+- **Spatial prediction resolver (§7.2b)** — engine and 8 tests only; see the note above on why the
+  mode is not wired up.
 - **Reproducible offline build (§3.1)** — ✅ **verified by tampering, not assumed.** Version
   catalogue (`gradle/libs.versions.toml`), six lockfiles pinning 96 coordinates including
   transitives, and the Gradle distribution SHA-256 — which was genuinely missing until now, so the
@@ -278,8 +283,10 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
 
 ### Not started — code
 
-1. **Spatial prediction, eyes-free mode (§7.2b).** R&D, explicitly optional, never default.
-2. **Themes (§11 v0.3).** The emoji half of this line item is done; themes are not.
+1. **Spatial prediction UI mode (§7.2b).** The *resolver* is built and tested; the mode is not
+   wired up, and deliberately so. §7.2b says to prototype it "after the touch model is calibrated
+   on real hardware", and calibration has not been run on the watch — building a mode on
+   uncalibrated constants would violate the precondition the spec itself sets.
 *(Release signing and the offline/reproducible build are both done — see the verified list below.)* No release keystore yet, and the
    "builds offline from a clean machine" claim needs dependency locking and checksums to be a fact
    rather than an aspiration.
