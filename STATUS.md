@@ -57,7 +57,7 @@ Wear requirement; without it the keyboard is invisible in most reply flows.
 |---|---|
 | Clipboard manager, encrypted at rest (§6) | ✅ built, 13 unit tests |
 | SymSpell-style autocorrect (§7.2) | ✅ verified both languages |
-| Installable language packs (§4.3) | ❌ not started |
+| Installable language packs (§4.3) | ⚠️ built, 6 tests — not verified on-device |
 
 Autocorrect was verified end to end on the watch in both languages: `helo` → **hello / help / held
 / hero**, and `привт` → **привет / приют**, with tap-to-accept committing the word and clearing the
@@ -123,9 +123,11 @@ geometry. Real values need a human session — one minute, via *Settings → К�
 | `:dict` | mmap dictionary reader | ✅ 5 files, 31 tests |
 | `:app` | IME host, settings, calibration | ✅ 9 files |
 | `:clipboard` | separate module | ⚠️ implemented inside `:ime-core`/`:app` instead |
-| `:engine-swipe` | DTW path matching | ❌ not started |
+| `:engine-swipe` | DTW path matching | ⚠️ built, 9 tests — not verified on-device |
 
-**Test coverage: 99 unit tests across four modules**, all passing in CI.
+**Test coverage: 114 unit tests across six modules**, all passing in CI.
+
+`:app` unit tests were added to the CI task list at the same time as the language-pack tests — they had been committed but never executed, since the task list named only four modules. A test that does not run is worse than none, because it reads as coverage.
 
 `:clipboard` is a deliberate deviation: the store is pure logic (in `:ime-core`, 13 tests) and the
 encryption is Android Keystore (in `:app`). A third module would have added a Gradle boundary
@@ -233,18 +235,22 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
   never at risk. Four tests pin the invariant so a future change cannot silently invalidate the
   argument.
 
+### Built this session, awaiting device verification
+
+- **Glide typing (§7.3), `:engine-swipe`** — resampling, banded DTW, frequency-ranked candidates,
+  trace capture, trail rendering and commit. 9 unit tests. The gestures in those tests are
+  synthetic; whether *real* swipes rank correctly is a device question and is not claimed here.
+- **Installable language packs (§4.3)** — signature-checked pack discovery, offline file import,
+  Settings screen. 6 unit tests. Each future pack still needs its own licence audit; roughly half
+  of common European languages are copyleft and cannot ship.
+
 ### Not started — code
 
-1. **Swipe / glide typing (§7.3), `:engine-swipe`.** The largest single remaining item. Now
-   unblocked: DTW scoring needs exactly the per-key probability distribution the touch model already
-   exposes.
-2. **Spatial prediction, eyes-free mode (§7.2b).** R&D, explicitly optional, never default.
-3. **Emoji layer and themes (§11 v0.3).**
-4. **Installable language packs (§4.3).** Each requires an individual licence audit — roughly half
-   of common European languages are copyleft and cannot ship.
-5. **Instrumented IME lifecycle smoke test (§9).** Zero `androidTest` sources exist.
-6. **First-run tutorial (§11.5).**
-7. **Release signing + reproducible offline build (§13, §3.1).** No release keystore yet, and the
+1. **Spatial prediction, eyes-free mode (§7.2b).** R&D, explicitly optional, never default.
+2. **Emoji layer and themes (§11 v0.3).**
+3. **Instrumented IME lifecycle smoke test (§9).** Zero `androidTest` sources exist.
+4. **First-run tutorial (§11.5).**
+5. **Release signing + reproducible offline build (§13, §3.1).** No release keystore yet, and the
    "builds offline from a clean machine" claim needs dependency locking and checksums to be a fact
    rather than an aspiration.
 
