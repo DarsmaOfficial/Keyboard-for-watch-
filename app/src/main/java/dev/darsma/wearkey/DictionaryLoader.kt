@@ -80,6 +80,42 @@ class DictionaryLoader(
         )
     }
 
+    /**
+     * Loads an add-on dictionary discovered by [LanguagePackManager] (spec §4.3).
+     *
+     * Kept separate from [loadFor] because the bundled languages are addressed by layout while
+     * packs are addressed by BCP-47 tag — conflating them would mean inventing a `Layout` value for
+     * every language a user might ever import.
+     *
+     * On failure the engine is left unloaded rather than holding a stale index: suggesting Dutch
+     * words while the user types Turkish is worse than suggesting nothing (spec §11 — degrade,
+     * never mislead).
+     */
+    @Synchronized
+    fun loadPack(manager: LanguagePackManager, pack: LanguagePack): Boolean {
+        val buffer = manager.map(pack) ?: run {
+            engine.unload()
+            loadedLayout = null
+            return false
+        }
+        return runCatching {
+            engine.load(buffer)
+            check(engine.isReady) { "invalid pack index: ${pack.languageTag}" }
+        }.fold(
+            onSuccess = {
+                // No layout owns this index, so the bundled-layout cache is cleared: the next
+                // loadFor() must genuinely reload rather than believe its language is resident.
+                loadedLayout = null
+                true
+            },
+            onFailure = {
+                engine.unload()
+                loadedLayout = null
+                false
+            }
+        )
+    }
+
     /** Directly maps one stored APK asset; no extracted copy and no heap-sized byte array. */
     private fun mapIndex(assetName: String): ByteBuffer {
         val descriptor = context.assets.openFd("dictionaries/$assetName")

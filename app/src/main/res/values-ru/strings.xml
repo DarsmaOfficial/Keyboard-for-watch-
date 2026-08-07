@@ -46,4 +46,20 @@
     <string name="frame_stats_recording">Идёт запись — печатайте, затем вернитесь</string>
     <string name="frame_stats_none">Пока нет данных</string>
     <string name="frame_stats_samples">измерено кадров: %1$d</string>
+    <string name="packs_title">Языковые пакеты</string>
+    <string name="packs_bundled_note">Английский и русский встроены.</string>
+    <string name="packs_none">Дополнительные словари не установлены.</string>
+    <string name="packs_import">Импорт из файла…</string>
+    <string name="packs_source_installed">установленный пакет</string>
+    <string name="packs_source_imported">импортирован</string>
+    <string name="packs_uninstall_hint">Удалите этот пакет через удаление его приложения.</string>
+    <string name="packs_confirm_remove">Нажмите ещё раз для удаления</string>
+    <string name="packs_removed">%1$s удалён</string>
+    <string name="packs_no_picker">На этом устройстве нет выбора файлов</string>
+    <string name="packs_import_unreadable">Не удалось прочитать файл</string>
+    <string name="packs_import_too_large">Файл слишком большой для словаря</string>
+    <string name="packs_import_bad_name">Назовите файл по языку, например nl.bin</string>
+    <string name="packs_import_invalid">Это не словарный индекс</string>
+    <string name="packs_import_ok">Импортирован %1$s</string>
+    <string name="settings_language_packs">Языковые пакеты</string>
 </resources>

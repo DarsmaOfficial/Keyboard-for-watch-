@@ -89,6 +89,12 @@ class SettingsActivity : Activity() {
         // redistribution terms are not satisfied by a link, and a link would break the
         // no-network rule anyway.
         column.addView(
+            row(getString(R.string.settings_language_packs), null) {
+                startActivity(Intent(this, LanguagePacksActivity::class.java))
+            }
+        )
+
+        column.addView(
             row(getString(R.string.settings_licenses), null) {
                 startActivity(Intent(this, LicensesActivity::class.java))
             }

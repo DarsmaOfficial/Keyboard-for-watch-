@@ -48,4 +48,20 @@
     <string name="frame_stats_recording">Recording — go and type, then come back</string>
     <string name="frame_stats_none">No samples yet</string>
     <string name="frame_stats_samples">%1$d draws measured</string>
+    <string name="packs_title">Language packs</string>
+    <string name="packs_bundled_note">English and Russian are built in.</string>
+    <string name="packs_none">No add-on dictionaries installed.</string>
+    <string name="packs_import">Import from file…</string>
+    <string name="packs_source_installed">installed pack</string>
+    <string name="packs_source_imported">imported</string>
+    <string name="packs_uninstall_hint">Remove this pack by uninstalling its app.</string>
+    <string name="packs_confirm_remove">Tap again to remove</string>
+    <string name="packs_removed">%1$s removed</string>
+    <string name="packs_no_picker">No file picker available on this device</string>
+    <string name="packs_import_unreadable">Could not read that file</string>
+    <string name="packs_import_too_large">That file is too large to be a dictionary</string>
+    <string name="packs_import_bad_name">Name the file after its language, e.g. nl.bin</string>
+    <string name="packs_import_invalid">That file is not a valid dictionary index</string>
+    <string name="packs_import_ok">Imported %1$s</string>
+    <string name="settings_language_packs">Language packs</string>
 </resources>
