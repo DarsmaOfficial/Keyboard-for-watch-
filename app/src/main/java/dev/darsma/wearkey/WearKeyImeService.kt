@@ -12,6 +12,7 @@ import dev.darsma.wearkey.uiwear.ClipboardPanelView
 import dev.darsma.wearkey.uiwear.EmojiPanelView
 import dev.darsma.wearkey.uiwear.HapticFeedback
 import dev.darsma.wearkey.uiwear.KeyGridView
+import dev.darsma.wearkey.uiwear.KeyboardTheme
 import dev.darsma.wearkey.uiwear.KeyboardSurfaceView
 import dev.darsma.wearkey.uiwear.SuggestionStripView
 
@@ -339,6 +340,10 @@ class WearKeyImeService : InputMethodService() {
         // Glide templates depend on the laid-out grid, so this is the earliest safe point. The
         // controller no-ops when nothing changed, which keeps opening a field cheap.
         surfaceView?.keyGrid?.let { swipeController.refresh(it) }
+
+        // Re-read on every field so a theme change in Settings takes effect at the next keyboard
+        // show, without needing the IME to be restarted.
+        surfaceView?.keyGrid?.theme = KeyboardTheme.byId(SettingsStore(this).themeId)
 
         // Clipboard reads are only legal while the IME holds focus (spec §6) — do it here.
         captureSystemClipboard(info)

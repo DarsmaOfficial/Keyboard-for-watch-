@@ -3,11 +3,13 @@ package dev.darsma.wearkey
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
+import android.util.TypedValue
 import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
+import dev.darsma.wearkey.uiwear.KeyboardTheme
 import android.widget.ScrollView
 import android.widget.TextView
 
@@ -91,6 +93,25 @@ class SettingsActivity : Activity() {
         // Open source licenses — REQUIRED to be viewable offline in-app (spec §3.2). BSD
         // redistribution terms are not satisfied by a link, and a link would break the
         // no-network rule anyway.
+        // Theme (spec §11 v0.3). A cycling row rather than a list screen: there are three themes
+        // and the effect is visible on the next keyboard show, so a whole extra Activity to pick
+        // between three values would cost more taps than it saves.
+        val themeValue = TextView(this).apply {
+            setTextColor(Color.parseColor("#9E9E9E"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        }
+        updateThemeLabel(themeValue)
+        column.addView(
+            row(getString(R.string.settings_theme), themeValue) {
+                val store = SettingsStore(this)
+                val ids = KeyboardTheme.ALL.map { t -> t.id }
+                val current = ids.indexOf(KeyboardTheme.byId(store.themeId).id)
+                store.themeId = ids[(current + 1) % ids.size]
+                updateThemeLabel(themeValue)
+                toast(getString(R.string.theme_changed))
+            }
+        )
+
         column.addView(
             row(getString(R.string.settings_tutorial), null) {
                 startActivity(Intent(this, TutorialActivity::class.java))
@@ -119,6 +140,17 @@ class SettingsActivity : Activity() {
         // IME is deliberate — an InputMethodService that starts an Activity would steal focus from
         // the field the user is trying to fill in.
         TutorialActivity.launchIfFirstRun(this)
+    }
+
+    private fun updateThemeLabel(view: TextView) {
+        val theme = KeyboardTheme.byId(SettingsStore(this).themeId)
+        view.text = getString(
+            when (theme.id) {
+                "high_contrast" -> R.string.theme_high_contrast
+                "amber" -> R.string.theme_amber
+                else -> R.string.theme_midnight
+            }
+        )
     }
 
     private fun updateHapticLabel(prefs: SettingsStore) {

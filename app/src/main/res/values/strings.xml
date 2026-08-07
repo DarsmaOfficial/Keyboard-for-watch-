@@ -79,4 +79,9 @@
     <string name="tutorial_privacy_title">Nothing leaves the watch</string>
     <string name="tutorial_privacy_body">No internet permission, no microphone, no analytics. Everything runs on the device.</string>
     <string name="settings_tutorial">How to type</string>
+    <string name="settings_theme">Theme</string>
+    <string name="theme_midnight">Midnight</string>
+    <string name="theme_high_contrast">High contrast</string>
+    <string name="theme_amber">Amber</string>
+    <string name="theme_changed">Theme applied</string>
 </resources>

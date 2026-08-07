@@ -77,4 +77,9 @@
     <string name="tutorial_privacy_title">Ничего не покидает часы</string>
     <string name="tutorial_privacy_body">Нет доступа в интернет, микрофона и аналитики. Всё работает на устройстве.</string>
     <string name="settings_tutorial">Как печатать</string>
+    <string name="settings_theme">Тема</string>
+    <string name="theme_midnight">Полночь</string>
+    <string name="theme_high_contrast">Высокий контраст</string>
+    <string name="theme_amber">Янтарь</string>
+    <string name="theme_changed">Тема применена</string>
 </resources>
