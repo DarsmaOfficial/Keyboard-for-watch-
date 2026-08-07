@@ -28,7 +28,7 @@ never measured is not a gate that passed.
 | Permissions declared | 0 | **0** — not even `INTERNET` | ✅ verified |
 | Composed text always visible | 100% of fields | verified in browser URL bar | ⚠️ partial — full context matrix pending |
 | Frame time, 95th percentile | ≥ 95% under 16.6 ms | **p95 = 2.51 ms, 0.39% over budget** (259 frames) | ✅ verified |
-| Cold IME show | < 150 ms | never measured | ❌ **not measured** |
+| Cold IME show | < 150 ms | **~890 ms** (debug build, n=3) | ❌ **FAIL — 6× over** |
 | Text entry rate | ≥ 15 WPM | never measured | ❌ **not measured** |
 | Battery vs Gboard | no regression | never measured | ❌ **not measured** |
 
@@ -249,6 +249,34 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
   text to our own storage would have added a place for it to leak while recovering data that was
   never at risk. Four tests pin the invariant so a future change cannot silently invalidate the
   argument.
+
+### Cold IME show — measured, and it FAILS the §14 gate
+
+Three clean samples on the watch: **890, 882 and 959 ms** against a **150 ms** budget — roughly
+6× over. This is a *debug* build (logcat shows `Late-enabling -Xcheck:jni`), so a release build
+with R8 will be faster, but nothing suggests it closes a 6× gap on its own. Treat this as a real
+failure to investigate, not a measurement artefact.
+
+**Getting a trustworthy number took four attempts, and three earlier ones were wrong:**
+
+1. `am force-stop` makes the framework treat the IME as uninstalled and **silently fall back to
+   Gboard**. `dumpsys input_method` still says `mInputShown=true`, so a naive script measures the
+   system keyboard and reports a plausible number. The script now verifies our own pid appears and
+   discards the sample otherwise — it correctly refused 15 times in a row before this was fixed.
+2. `am kill` does nothing to the active IME: the framework holds it as a persistent process, the
+   pid is unchanged, and the next show is warm.
+3. **A `sleep` inside the measured interval destroys the measurement.** Opening the browser, then
+   sleeping 4 s, then tapping reported ~2400 ms — that number described the sleep. The field must
+   already be on screen so the tap triggers process start and show back to back.
+
+What works: reinstall the APK (restarts the process, keeps the IME selected), with the browser and
+field already visible. Markers are framework lines — `ActivityManager: Start proc <pid>` to
+`InsetsController: show(ime(), fromIme=true)` — because §11.5 forbids logging in keyboard sources
+and CI enforces that, so no app-side instrumentation is possible.
+
+Script: `measure-coldshow.sh`. **Next step is to find where the ~880 ms goes** — likely candidates
+are dictionary mmap, layout JSON parsing, and first-draw of the key grid, none of which have been
+attributed yet.
 
 ### Built this session, awaiting device verification
 
