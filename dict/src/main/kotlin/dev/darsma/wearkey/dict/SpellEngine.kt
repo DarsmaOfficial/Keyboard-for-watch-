@@ -55,6 +55,29 @@ class SpellEngine {
     }
 
     /**
+     * Snapshot of the vocabulary and its frequencies, for building glide-typing templates (§7.3).
+     *
+     * [limit] caps how many words are taken. Because the index is ordered by descending frequency,
+     * taking a prefix keeps the *most common* words rather than an arbitrary slice — so a cap
+     * trades recall for memory in the least damaging way available.
+     *
+     * This is intentionally a copy rather than a live view. The recogniser holds it for the
+     * lifetime of a layout, and a view over a buffer that [unload] can invalidate would turn a
+     * language switch into a crash.
+     */
+    fun vocabularySnapshot(limit: Int): Pair<List<String>, IntArray> {
+        val idx = index ?: return emptyList<String>() to IntArray(0)
+        val n = minOf(limit, idx.size)
+        val words = ArrayList<String>(n)
+        val freqs = IntArray(n)
+        for (i in 0 until n) {
+            words.add(idx.wordAtIndex(i))
+            freqs[i] = idx.frequencyAt(i)
+        }
+        return words to freqs
+    }
+
+    /**
      * Correction candidates for [word], best first. Empty when no index is loaded.
      *
      * Candidates arrive pre-ranked by corpus frequency because the index stores words in

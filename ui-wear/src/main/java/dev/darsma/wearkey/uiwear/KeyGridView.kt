@@ -604,6 +604,43 @@ class KeyGridView @JvmOverloads constructor(
         drawDurationsUs[drawSampleCount++] = (durationNanos / 1_000L).toInt()
     }
 
+    /**
+     * The glide trail.
+     *
+     * Drawn as a fading polyline rather than a uniform stroke: the tail dimming toward the start
+     * tells the user which direction the gesture is travelling, which matters on a 466 px display
+     * where a path can cross itself several times in a single word. The trail is deliberately thin
+     * and low-contrast — it is feedback, not decoration, and a heavy stroke obscures the very keys
+     * the user is aiming at next.
+     */
+    private val trailPaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        // Same cyan the caret and calibration use, so the accent means one thing throughout.
+        color = Color.parseColor("#00E5FF")
+    }
+
+    private fun drawTrail(canvas: Canvas) {
+        if (!swiping || traceCount < 2) return
+
+        val density = resources.displayMetrics.density
+        val maxWidth = TRAIL_WIDTH_DP * density
+
+        // Only the recent tail is drawn. Keeping the whole path visible turns a long word into a
+        // scribble that hides the grid.
+        val first = if (traceCount > TRAIL_MAX_SEGMENTS) traceCount - TRAIL_MAX_SEGMENTS else 0
+        val span = (traceCount - 1 - first).coerceAtLeast(1)
+
+        for (i in first until traceCount - 1) {
+            val t = (i - first + 1).toFloat() / span
+            trailPaint.strokeWidth = maxWidth * (0.35f + 0.65f * t)
+            trailPaint.alpha = (255 * (0.15f + 0.65f * t)).toInt()
+            canvas.drawLine(traceX[i], traceY[i], traceX[i + 1], traceY[i + 1], trailPaint)
+        }
+    }
+
     private fun drawContent(canvas: Canvas) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
 
@@ -661,6 +698,10 @@ class KeyGridView @JvmOverloads constructor(
 
             if (scaled) canvas.restore()
         }
+
+        // Painted last so the trail rides over the keys. Under them it would be occluded by the
+        // very keys the gesture is crossing, which is where the user is actually looking.
+        drawTrail(canvas)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -668,10 +709,30 @@ class KeyGridView @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 pressedKey = keyAt(event.x, event.y)
                 if (pressedKey != null) animatePressTo(PRESSED_SCALE)
+                beginTrace(event.x, event.y)
                 invalidate()
                 return pressedKey != null
             }
             MotionEvent.ACTION_MOVE -> {
+                // Historical points matter here: the digitiser batches samples between frames, and
+                // spec §7.3 asks for full resolution. Dropping them would thin out exactly the fast
+                // parts of a swipe, where the shape carries the most information.
+                for (h in 0 until event.historySize) {
+                    traceTo(event.getHistoricalX(h), event.getHistoricalY(h))
+                }
+                traceTo(event.x, event.y)
+
+                if (swiping) {
+                    // Once it is a swipe, no key is "pressed" — showing a pressed key under a
+                    // travelling finger reads as a stuck key.
+                    if (pressedKey != null) {
+                        pressedKey = null
+                        animatePressTo(1f)
+                    }
+                    invalidate()
+                    return true
+                }
+
                 val current = keyAt(event.x, event.y)
                 if (current !== pressedKey) {
                     pressedKey = current
@@ -685,7 +746,15 @@ class KeyGridView @JvmOverloads constructor(
                 pressedKey = null
                 // Spring back with the bounce — this is the part that reads as physical.
                 animatePressTo(1f)
+
+                if (swiping) {
+                    finishTrace()
+                    invalidate()
+                    return true
+                }
+                resetTrace()
                 invalidate()
+
                 if (released != null) {
                     handleKeyAction(released)
                     return true
@@ -695,12 +764,116 @@ class KeyGridView @JvmOverloads constructor(
             MotionEvent.ACTION_CANCEL -> {
                 pressedKey = null
                 animatePressTo(1f)
+                resetTrace()
                 invalidate()
                 return true
             }
         }
         return false
     }
+
+    // ---------------------------------------------------------------------------------------
+    // Glide typing (spec §7.3)
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * Reusable sample buffers. Sized once for a generous gesture; a swipe that somehow exceeds this
+     * simply stops accumulating rather than reallocating mid-drag, because §7.3 requires the drag
+     * path to allocate nothing and a truncated tail costs far less than a GC pause mid-gesture.
+     */
+    private val traceX = FloatArray(MAX_TRACE_POINTS)
+    private val traceY = FloatArray(MAX_TRACE_POINTS)
+    private var traceCount = 0
+    private var traceLength = 0f
+    private var swiping = false
+
+    /** Set by the host when a recogniser is available; when null the grid behaves as tap-only. */
+    var swipeListener: OnSwipeListener? = null
+
+    fun interface OnSwipeListener {
+        /** Receives the raw normalised trace; the host owns recognition and candidate display. */
+        fun onSwipe(xs: FloatArray, ys: FloatArray, count: Int)
+    }
+
+    /**
+     * Letter keys of the current layout as `(letters, xs, ys)`, for building glide templates.
+     *
+     * Only `Character` keys are returned, and only single-character ones. A swipe path runs across
+     * letters; including space or backspace would let a template route through a key that no finger
+     * crosses mid-word, and would make every word ending near the space bar look alike.
+     *
+     * Returns null while the grid has not been laid out, since key rects are meaningless then.
+     */
+    fun letterGeometry(): Triple<String, FloatArray, FloatArray>? {
+        if (keys.isEmpty() || width == 0) return null
+
+        val sb = StringBuilder()
+        val xs = ArrayList<Float>()
+        val ys = ArrayList<Float>()
+        for (key in keys) {
+            val action = key.action
+            if (action is KeyAction.Character && action.char.isLetter()) {
+                sb.append(action.char.lowercaseChar())
+                xs.add(key.rect.centerX())
+                ys.add(key.rect.centerY())
+            }
+        }
+        if (sb.isEmpty()) return null
+        return Triple(sb.toString(), xs.toFloatArray(), ys.toFloatArray())
+    }
+
+    private fun beginTrace(x: Float, y: Float) {
+        traceCount = 0
+        traceLength = 0f
+        swiping = false
+        appendTrace(x, y)
+    }
+
+    private fun traceTo(x: Float, y: Float) {
+        if (traceCount == 0) {
+            appendTrace(x, y)
+            return
+        }
+        val dx = x - traceX[traceCount - 1]
+        val dy = y - traceY[traceCount - 1]
+        val step = kotlin.math.sqrt(dx * dx + dy * dy)
+
+        // Ignore sub-pixel jitter so a resting finger cannot accumulate its way past the threshold.
+        if (step < MIN_TRACE_STEP_PX) return
+
+        traceLength += step
+        appendTrace(x, y)
+
+        // The tap/swipe decision. Distance rather than time, because a slow deliberate glide is
+        // still a glide, and a fast flick within one key is still a tap. The threshold is in dp so
+        // it means the same thing on any density.
+        if (!swiping && swipeListener != null && traceLength >= swipeThresholdPx) {
+            swiping = true
+        }
+    }
+
+    private fun appendTrace(x: Float, y: Float) {
+        if (traceCount >= MAX_TRACE_POINTS) return
+        traceX[traceCount] = x
+        traceY[traceCount] = y
+        traceCount++
+    }
+
+    private fun finishTrace() {
+        val listener = swipeListener
+        val count = traceCount
+        resetTrace()
+        if (listener != null && count >= 2) listener.onSwipe(traceX, traceY, count)
+    }
+
+    private fun resetTrace() {
+        traceCount = 0
+        traceLength = 0f
+        swiping = false
+    }
+
+    private val swipeThresholdPx: Float
+        get() = SWIPE_THRESHOLD_DP * resources.displayMetrics.density
 
     /**
      * Resolves a touch to a key using the bivariate Gaussian model (spec §7.1).
@@ -915,6 +1088,32 @@ class KeyGridView @JvmOverloads constructor(
          * change reads as the key wobbling rather than depressing.
          */
         private const val PRESSED_SCALE = 0.88f
+
+        /**
+         * Travel before a drag is reinterpreted as a glide rather than a press.
+         *
+         * 24 dp is roughly half a key on this grid: far enough that ordinary finger roll during a
+         * tap cannot reach it, short enough that a two-letter glide between neighbours still
+         * registers. Below about 16 dp, taps on the round display's edge keys — where the finger
+         * naturally slides along the bezel — start being misread as swipes.
+         */
+        private const val SWIPE_THRESHOLD_DP = 24f
+
+        /** Sub-pixel movement is digitiser noise, not travel; see [traceTo]. */
+        private const val MIN_TRACE_STEP_PX = 1.5f
+
+        /**
+         * Capacity of the reusable trace buffers. A long word crosses the grid a few times at
+         * ~100 Hz, so 512 points is generous; the cap exists to keep the drag path allocation-free
+         * (§7.3) rather than to limit gesture length in practice.
+         */
+        private const val MAX_TRACE_POINTS = 512
+
+        /** Trail stroke width at its thickest (the leading end). */
+        private const val TRAIL_WIDTH_DP = 3.5f
+
+        /** How much of the tail stays visible; older points are dropped, not faded to nothing. */
+        private const val TRAIL_MAX_SEGMENTS = 48
 
         /** Gap drawn between adjacent keys. Small — touch slop is handled in [keyAt] instead. */
         private const val KEY_GAP_PX = 3f

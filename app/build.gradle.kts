@@ -70,6 +70,7 @@ dependencies {
     implementation(project(":ime-core"))
     implementation(project(":layout-engine"))
     implementation(project(":dict"))
+    implementation(project(":engine-swipe"))
     // Intentionally minimal for Phase 0: no Compose, no NDK, no INTERNET-requiring libs.
     // androidx.dynamicanimation is added in Phase 3 (motion) — not needed to draw a static grid.
 }

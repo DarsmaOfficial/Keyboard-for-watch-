@@ -9,6 +9,7 @@ import dev.darsma.wearkey.dict.SpellEngine
 import dev.darsma.wearkey.imecore.ClipboardStore
 import dev.darsma.wearkey.imecore.EditorState
 import dev.darsma.wearkey.uiwear.ClipboardPanelView
+import dev.darsma.wearkey.uiwear.HapticFeedback
 import dev.darsma.wearkey.uiwear.KeyGridView
 import dev.darsma.wearkey.uiwear.KeyboardSurfaceView
 import dev.darsma.wearkey.uiwear.SuggestionStripView
@@ -32,6 +33,7 @@ class WearKeyImeService : InputMethodService() {
     private val clipboardPersistence by lazy { EncryptedClipboardPersistence(this) }
 
     private val spellEngine = SpellEngine()
+    private val swipeController = SwipeController(spellEngine)
     private val dictionaryLoader by lazy { DictionaryLoader(this, spellEngine) }
 
     /**
@@ -46,7 +48,8 @@ class WearKeyImeService : InputMethodService() {
         clipboardPersistence.load(clipboardStore)
         // Persist on every change so a kill by memory pressure never loses entries.
         clipboardStore.addListener(ClipboardStore.Listener { clipboardPersistence.save(clipboardStore) })
-        // Word list loads on a background thread; until it lands, autocorrect is simply absent.
+        // Mapping the index is synchronous and far below one frame — it maps pages rather than
+        // reading them — so autocorrect and glide typing are available from the first field.
         dictionaryLoader.loadFor(KeyGridView.Layout.EN_US)
     }
 
@@ -115,10 +118,56 @@ class WearKeyImeService : InputMethodService() {
         surfaceView?.suggestionStrip?.clear()
     }
 
+    /**
+     * Commits a glide-typed word and offers the runners-up (spec §7.3).
+     *
+     * ## Why a leading space is inserted here
+     *
+     * Glide typing produces whole words, so the user never presses space between them. Without this
+     * the second swipe would append directly to the first and produce "helloworld". The space is
+     * suppressed at the very start of a field and after existing whitespace or an opening bracket,
+     * where a leading space would be wrong rather than helpful.
+     *
+     * ## Why the alternatives go to the suggestion strip
+     *
+     * A swipe is inherently ambiguous — "hello" and "hell" trace nearly the same path. Committing
+     * the top candidate silently and offering the rest lets the user fix a miss with one tap
+     * instead of deleting five characters, and it matches how the tap-typing correction path
+     * already behaves.
+     */
+    private fun handleSwipe(xs: FloatArray, ys: FloatArray, count: Int) {
+        if (suggestionsDisabled) return
+        val ic = currentInputConnection ?: return
+
+        val density = resources.displayMetrics.density
+        val candidates = swipeController.recognise(xs, ys, count, density)
+        if (candidates.isEmpty()) return
+
+        val word = candidates.first()
+        val needsSpace = editorState.text.lastOrNull()?.let { prev ->
+            prev != ' ' && prev != '\n' && prev != '(' && prev != '[' && prev != '"'
+        } ?: false
+        val insertion = if (needsSpace) " $word" else word
+
+        ic.beginBatchEdit()
+        try {
+            editorState.commitText(insertion)
+            ic.commitText(insertion, 1)
+        } finally {
+            ic.endBatchEdit()
+        }
+
+        surfaceView?.keyGrid?.haptics?.perform(HapticFeedback.Feedback.ENTER)
+        surfaceView?.suggestionStrip?.setSuggestions(candidates.drop(1))
+    }
+
     override fun onCreateInputView(): View {
         val view = KeyboardSurfaceView(this)
         view.bind(editorState)
         view.keyGrid.onKeyListener = KeyGridView.OnKeyListener { action -> handleKey(action) }
+        view.keyGrid.swipeListener = KeyGridView.OnSwipeListener { xs, ys, count ->
+            handleSwipe(xs, ys, count)
+        }
         view.clipboardPanel.bind(clipboardStore)
         view.clipboardPanel.listener = object : ClipboardPanelView.Listener {
             override fun onPaste(text: String) {
@@ -252,6 +301,10 @@ class WearKeyImeService : InputMethodService() {
         suggestionsDisabled = masked || noLearning
         surfaceView?.suggestionStrip?.clear()
 
+        // Glide templates depend on the laid-out grid, so this is the earliest safe point. The
+        // controller no-ops when nothing changed, which keeps opening a field cheap.
+        surfaceView?.keyGrid?.let { swipeController.refresh(it) }
+
         // Clipboard reads are only legal while the IME holds focus (spec §6) — do it here.
         captureSystemClipboard(info)
         // Never leave the clipboard panel open across fields.
@@ -289,6 +342,8 @@ class WearKeyImeService : InputMethodService() {
         surfaceView?.keyGrid?.layout = layout
         // Swap the resident dictionary to match — only one language stays loaded (spec §4.2).
         dictionaryLoader.loadFor(layout)
+        // Templates are language- and layout-specific; the next field rebuilds them.
+        swipeController.clear()
         surfaceView?.suggestionStrip?.clear()
     }
 
@@ -407,6 +462,7 @@ class WearKeyImeService : InputMethodService() {
         // was Cyrillic while no_backup contained only en.bin). Keep the resident index in lockstep
         // with the visible layout, exactly as onCurrentInputMethodSubtypeChanged does.
         dictionaryLoader.loadFor(next)
+        swipeController.clear()
         surfaceView?.suggestionStrip?.clear()
     }
 

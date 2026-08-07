@@ -208,6 +208,18 @@ class WordIndex private constructor(
     /** Corpus frequency of the word at [index]; higher is more common. */
     fun frequencyAt(index: Int): Int = int(frequencyPos, index)
 
+    /**
+     * The word at [index], for callers that need to enumerate the vocabulary.
+     *
+     * Exposed for glide typing (spec §7.3), which must build one path template per word up front.
+     * That is the only legitimate reason to walk the whole index — correction lookups go through
+     * [lookup], which touches a few hundred candidates rather than tens of thousands.
+     *
+     * Materialising a String here is unavoidable, but the caller does it once per layout change,
+     * not per keystroke, so the mmap design's zero-heap property is preserved in the hot path.
+     */
+    fun wordAtIndex(index: Int): String = wordAt(index)
+
     private fun collectInto(sink: MutableSet<Int>, variant: String) {
         val slot = findVariant(hash64(variant))
         if (slot < 0) return
