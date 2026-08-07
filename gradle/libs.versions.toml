@@ -1,0 +1,26 @@
+# Version catalogue (spec §3.1).
+#
+# Every external dependency in the project is declared here and nowhere else. The point is not
+# tidiness — it is that "what does this project depend on?" has exactly one answer, which can be
+# read without grepping five build files. Combined with the lockfiles in each module, this is what
+# turns "builds offline" from a claim into something checkable.
+#
+# Adding a dependency here is a deliberate act. Spec §12 asks for every one to be justified, and
+# §8.0 forbids androidx.compose in :app and :ui-wear outright — CI enforces that separately by
+# inspecting the resolved runtime classpath, because a catalogue entry only records intent.
+
+[versions]
+# 1.0.0 is the only stable release; it has had no API changes since 2020.
+dynamicanimation = "1.0.0"
+# androidx.test — instrumented smoke test only (§9). Never enters the shipped APK: these are
+# androidTest-scoped, so they are absent from releaseRuntimeClasspath.
+testExtJunit = "1.2.1"
+testRunner = "1.6.2"
+
+[libraries]
+# Spring physics for the key-press animation (§8.0). 31 KB, Apache-2.0, and deliberately NOT
+# Compose — the dynamicanimation artifact predates Compose and pulls none of it in.
+androidx-dynamicanimation = { module = "androidx.dynamicanimation:dynamicanimation", version.ref = "dynamicanimation" }
+
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "testExtJunit" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "testRunner" }

@@ -27,7 +27,7 @@ dependencies {
     implementation(project(":layout-engine"))
     // Spec §8.0: real spring physics, not tween approximations. 31 KB, Apache-2.0, and
     // explicitly NOT androidx.compose — the CI gate still passes.
-    implementation("androidx.dynamicanimation:dynamicanimation:1.0.0")
+    implementation(libs.androidx.dynamicanimation)
     // Phase 0/1/2: plain View + Canvas only.
     // androidx.dynamicanimation (spring physics, 31 KB) is added in Phase 3 — not yet.
     // HARD RULE (spec §8.0): this module must never depend on androidx.compose.* —
