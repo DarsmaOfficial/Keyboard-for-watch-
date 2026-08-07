@@ -104,6 +104,26 @@ jobs:
           echo "--- published files ---"
           ls -la
 
+      # A signed-but-wrong-key APK is indistinguishable from a correct one until users cannot
+      # upgrade. The fingerprint is public - it ships inside every APK - so pinning it here leaks
+      # nothing and turns that silent failure into a build error.
+      - name: Verify signing certificate is the expected one
+        if: steps.keystore.outputs.present == 'true'
+        env:
+          EXPECTED: "53:08:BA:BB:6D:04:D4:B7:3D:8A:05:91:B0:E7:9B:C4:5A:3E:7C:28:40:FF:6A:39:DC:A7:83:96:5D:35:20:EB"
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
+          ACTUAL=$("$APKSIGNER" verify --print-certs "dist/${{ steps.stage.outputs.name }}" \
+            | grep -i "SHA-256 digest" | head -1 | awk '{print $NF}')
+          # apksigner prints the digest without colons; normalise the expected value to match.
+          NORM=$(echo "$EXPECTED" | tr -d ':' | tr 'A-Z' 'a-z')
+          echo "expected: $NORM"
+          echo "actual:   $ACTUAL"
+          if [ "$ACTUAL" != "$NORM" ]; then
+            echo "::error::release APK signed with an unexpected certificate"
+            exit 1
+          fi
+
       - name: Verify release APK has no native libs
         run: |
           if unzip -l "dist/${{ steps.stage.outputs.name }}" | grep -q "lib/"; then
