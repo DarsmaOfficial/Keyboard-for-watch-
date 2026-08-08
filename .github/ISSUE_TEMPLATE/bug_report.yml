@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a reproducible WearKey problem
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve WearKey. Please do not include passwords, message contents, clipboard text, or any other sensitive input.
+  - type: input
+    id: watch
+    attributes:
+      label: Watch model and Wear OS version
+      placeholder: "e.g. OnePlus Watch 2, Wear OS 4"
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: App or reply surface
+      placeholder: "e.g. browser URL field, notification reply"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. …\n2. …\n3. …"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: dropdown
+    id: sensitive
+    attributes:
+      label: Did your report omit sensitive text?
+      options: ["Yes", "I need to edit this report"]
+    validations:
+      required: true
