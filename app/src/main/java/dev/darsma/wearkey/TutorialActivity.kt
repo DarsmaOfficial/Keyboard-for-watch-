@@ -8,6 +8,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 
 /**
@@ -50,13 +51,18 @@ class TutorialActivity : Activity() {
 
         container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
+            gravity = Gravity.CENTER_HORIZONTAL
             setBackgroundColor(Color.BLACK)
             // Generous horizontal inset: on a round display the corners of a full-width text block
-            // fall outside the glass entirely.
-            setPadding(pad(28), pad(24), pad(28), pad(24))
+            // fall outside the glass entirely. Bottom padding keeps the controls away from the
+            // curved bezel after scrolling long translations into view.
+            setPadding(pad(28), pad(24), pad(28), pad(40))
         }
-        setContentView(container)
+        setContentView(ScrollView(this).apply {
+            setBackgroundColor(Color.BLACK)
+            isFillViewport = true
+            addView(container)
+        })
         render()
     }
 
