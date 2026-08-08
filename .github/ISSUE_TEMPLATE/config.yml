@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Privacy and security question
+    url: https://github.com/DarsmaOfficial/Keyboard-for-watch-/security/advisories/new
+    about: Please report potential privacy or security issues privately.
+  - name: Build and contribution guide
+    url: https://github.com/DarsmaOfficial/Keyboard-for-watch-/blob/main/CONTRIBUTING.md
+    about: Read the project constraints and local build steps before proposing a change.

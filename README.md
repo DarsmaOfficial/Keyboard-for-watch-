@@ -1,133 +1,124 @@
 # WearKey
 
-A free, fully offline keyboard for Wear OS — built because Gboard on a watch hides the very
-text you are typing.
+<p align="center">
+  <img src=".github/social-preview.png" alt="WearKey — an offline Wear OS keyboard that keeps text visible" width="100%">
+</p>
 
-**The problem it solves:** on Wear OS the keyboard covers the text field. You type blind, and
-correcting a mistake means guessing. WearKey constrains itself to the lower part of the display
-so the app's real field stays visible, and additionally mirrors what you are composing in a
-strip directly above the keys, with a caret you can tap or drag to reposition.
+<p align="center">
+  <strong>See what you type on a watch.</strong><br>
+  A free, fully offline keyboard for Wear OS.
+</p>
 
-Primary target is the **OnePlus Watch 2**; it should install and run on generic Wear OS 3/4
-devices (`minSdk 30`).
-
----
-
-## Free, forever — and what that actually means
-
-- **No cost, no tiers, no subscriptions, no trial.** Ever.
-- **No account.** Download an APK, side-load it, done. Nothing to sign into.
-- **No network permission at all.** `android.permission.INTERNET` is not in the manifest — the
-  app is *incapable* of talking to a server, not merely configured not to. Verify it yourself:
-  ```sh
-  unzip -p app-release.apk AndroidManifest.xml | strings | grep -i internet   # no match
-  ```
-- **No microphone.** `RECORD_AUDIO` is not requested. There is no voice input and none is
-  planned — this is a touch-only keyboard by design.
-- **No telemetry, no analytics, no crash reporting SaaS, no ads.**
-- **No cloud AI, no "smart" features that phone home.**
-
-See [`PRIVACY.md`](PRIVACY.md) for the full statement, including exactly what is stored on the
-device and how to erase it.
+<p align="center">
+  <a href="https://github.com/DarsmaOfficial/Keyboard-for-watch-/actions/workflows/build.yml"><img src="https://github.com/DarsmaOfficial/Keyboard-for-watch-/actions/workflows/build.yml/badge.svg?branch=main" alt="Build status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-00E5FF?style=flat-square" alt="Apache-2.0 licence"></a>
+  <img src="https://img.shields.io/badge/Wear%20OS-3%20%2F%204-10191C?style=flat-square" alt="Wear OS 3 and 4">
+  <img src="https://img.shields.io/badge/network-permission%3A%20none-10191C?style=flat-square" alt="No network permission">
+</p>
 
 ---
 
-## Status
+## The problem
 
-Early, but usable for typing. What works today:
+On Wear OS, a keyboard can cover the field you are trying to edit. That makes typing a
+small guessing game with an unhelpful ending.
 
-- Installs, enables and is selectable as a system keyboard
-- Works through **both** Wear OS text-entry paths: the standard `InputMethodService`, and the
-  `LAUNCH_KEYBOARD` activity that notification replies / WhatsApp / browser fields actually use
-- Live composition strip with a blinking caret; tap or drag on the strip to move the caret
-- Round-display key geometry — rows are fitted to the circle so keys are not lost under the bezel
-- English and Russian layouts with an in-keyboard language key
-- Clipboard history: one-tap paste, pin, delete, clear-all, with automatic early expiry for
-  OTP- and card-number-looking entries
-- Password fields are masked — plaintext never enters the preview buffer
+WearKey leaves the upper screen available for the **real app field** and keeps a compact,
+caret-aware composition strip directly above its keys. You can see what changed, move the caret,
+and correct it before committing more text.
 
-- Shift with caps lock, and a two-page symbol/number layer
-- Vibration feedback, with an intensity setting including full off
-- Settings screen with an offline "open source licences" viewer
+| What matters | How WearKey approaches it |
+|---|---|
+| **Text must stay visible** | Keyboard is constrained to the lower 66% of the display; the composition strip is a fallback mirror, not a replacement for the real field. |
+| **A keyboard should not be a surveillance device** | No `INTERNET`, no microphone, no telemetry, no account, no cloud dependency. |
+| **A watch needs watch-sized interaction** | Circular key geometry, haptics, caret scrubbing, English/Russian layouts, and a dedicated Wear `LAUNCH_KEYBOARD` entry point. |
+| **Claims should be testable** | CI checks permissions, native libraries, Compose leakage, APK size, dictionary packaging, index drift, and keystroke logging. |
 
-Not done yet: autocorrect, glide typing, emoji layer, press animations.
-See [`CHANGELOG.md`](CHANGELOG.md).
+## Built for calm, offline typing
 
-### Known limitation: TalkBack
+- **Live composition strip** — blinking caret; tap or drag to reposition it.
+- **Two Wear OS entry points** — standard IME and `LAUNCH_KEYBOARD` for reply-oriented flows.
+- **Round-first key grid** — probabilistic touch matching continues outer keys toward the screen edge.
+- **English + Russian** — switch directly from the keyboard.
+- **Autocorrect and glide typing** — frequency-ranked offline dictionaries; no text leaves the watch.
+- **Spatial prediction** *(experimental, opt-in)* — resolves ambiguous taps when a word boundary is reached.
+- **Clipboard history** — encrypted at rest, one-tap paste, pin/delete/clear; sensitive-looking entries expire early unless pinned.
+- **Emoji, themes, tutorial, calibration** — all local; no bundled cloud features hiding in settings.
+- **Input-aware safety** — password/PIN previews use bullets and never retain plaintext.
 
-The key grid is drawn on a `Canvas`, which means the system sees it as one opaque view rather
-than a set of keys. Individual key presses are announced, but **touch-exploration mode does not
-work properly** — sliding a finger to hear keys before committing them will not behave as it
-should. Fixing this needs a virtual accessibility node hierarchy
-(`AccessibilityNodeProvider`), which is not implemented yet. If you rely on TalkBack, this
-keyboard is not usable for you today.
+> [!IMPORTANT]
+> WearKey is usable, but it is not yet fully hardware-certified. See
+> [`STATUS.md`](STATUS.md) for the measured facts, deferred device checks, and the strict
+> true-cold-start gate that currently fails.
 
----
+## Privacy is an implementation detail, not a slogan
+
+```text
+No account · No telemetry · No ads · No microphone · No network permission
+```
+
+Without `android.permission.INTERNET`, the app cannot open a network connection. It does not
+need a privacy policy that asks you to trust an exception list; its Android manifest makes the
+most important promise enforceable. Read the exact storage and erasure rules in
+[`PRIVACY.md`](PRIVACY.md).
 
 ## Install
 
-1. Download `app-debug.apk` (or a signed release APK) from the
-   [Releases page](https://github.com/DarsmaOfficial/Keyboard-for-watch-/releases).
-2. Install it on the watch:
+1. Download a signed release APK from [Releases](https://github.com/DarsmaOfficial/Keyboard-for-watch-/releases).
+2. Install and select it:
+
    ```sh
-   adb connect <watch-ip>:<port>       # Settings > Developer options > Wireless debugging
-   adb install -r app-debug.apk
-   ```
-3. Enable and select it:
-   ```sh
+   adb connect <watch-ip>:<port>
+   adb install -r app-release.apk
    adb shell ime enable dev.darsma.wearkey/.WearKeyImeService
-   adb shell ime set    dev.darsma.wearkey/.WearKeyImeService
+   adb shell ime set dev.darsma.wearkey/.WearKeyImeService
    ```
-   Or on the watch: **Settings → General → Input → Keyboards**.
 
-No computer? The same two `ime` commands can be run through
-[Shizuku](https://shizuku.rikka.app/) on the watch itself.
+   Or enable it on the watch through **Settings → General → Input → Keyboards**.
 
-The APK also works when copied device-to-device (Bluetooth, USB, a file transfer app) — this
-project deliberately does not depend on any store or platform remaining available.
+The primary target is **OnePlus Watch 2**. WearKey targets Wear OS 3/4 (`minSdk 30`) and is
+pure Kotlin/JVM: no native ABI payloads, no store dependency, no companion service required.
 
----
+## Build it yourself
 
-## Build from source
-
-Requires a JDK 17 and the Android SDK (platform 36, build-tools 36.1.0). No network access is
-needed beyond the initial dependency download.
+Requires JDK 17 plus Android SDK platform 36 / build-tools 36.1.0.
 
 ```sh
 git clone https://github.com/DarsmaOfficial/Keyboard-for-watch-.git
 cd Keyboard-for-watch-
 ./gradlew :app:assembleDebug
-# APK lands in app/build/outputs/apk/debug/
 ```
 
-Run the unit tests:
+The APK lands in `app/build/outputs/apk/debug/`. The project supports an offline build once
+dependencies are present; see [`OFFLINE_BUILD.md`](OFFLINE_BUILD.md).
 
 ```sh
-./gradlew :ime-core:test
+./gradlew :ime-core:test :dict:test :layout-engine:test :engine-swipe:test :ui-wear:testDebugUnitTest :app:testDebugUnitTest
 ```
 
-Continuous integration is a convenience only — the build must always work offline on a
-developer machine.
+## Project map
 
----
-
-## Architecture, briefly
-
-| Module | Contents |
+| Area | What lives there |
 |---|---|
-| `:ime-core` | Pure Kotlin/JVM. `EditorState` (composition/caret state machine) and `ClipboardStore`. No Android dependencies, unit-testable without a device. |
-| `:ui-wear` | The keyboard surface: key grid, composition strip, clipboard panel. Plain `View` + `Canvas` — deliberately **zero** `androidx.compose.*` dependencies, enforced in CI. |
-| `:app` | `InputMethodService`, the `LAUNCH_KEYBOARD` activity, manifest. |
+| [`:ime-core`](ime-core/) | Pure Kotlin editor state, caret/composition semantics, touch calibration, clipboard logic. |
+| [`:dict`](dict/) | Packed memory-mapped dictionary index and frequency-ranked correction. |
+| [`:engine-swipe`](engine-swipe/) | Glide recognition and spatial word resolver. |
+| [`:ui-wear`](ui-wear/) | Canvas/View keyboard surface, panels, strip, motion and accessibility provider. |
+| [`:app`](app/) | IME service, Wear launch activity, settings, assets and Android integration. |
 
-See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the reasoning.
+For the decisions behind the layout, memory budget, dictionary format and lifecycle rules, read
+[`ARCHITECTURE.md`](ARCHITECTURE.md). For the complete build/measurement state, read
+[`STATUS.md`](STATUS.md).
 
----
+## Contribute without breaking the point
+
+This project accepts contributions under Apache-2.0, with no CLA or copyright assignment. The
+constraints are deliberate: no network permission, microphone, native code, paid services,
+tracking, GPL/AGPL code, or Compose in the keyboard path.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a PR.
 
 ## Licence
 
-Apache-2.0 — see [`LICENSE`](LICENSE), [`NOTICE`](NOTICE) and
-[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
-
-Apache-2.0 was chosen partly for its express patent grant, which MIT and GPL-2.0 lack. A
-consequence, and it is binding: code may only be borrowed from MIT / Apache-2.0 / BSD sources.
-GPL and AGPL keyboards may be studied for ideas, never copied from.
+Apache-2.0 — [`LICENSE`](LICENSE) · [`NOTICE`](NOTICE) ·
+[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)
