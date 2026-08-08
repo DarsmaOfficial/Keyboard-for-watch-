@@ -622,11 +622,6 @@ class KeyGridView @JvmOverloads constructor(
         // target list would silently map taps to the previous layout's keys after a language or
         // layer switch.
         rebuildTouchTargets()
-
-        // Virtual view ids are key indices, so a layout change reassigns them. Tell the
-        // accessibility framework to discard the old tree; a screen reader holding a stale node
-        // would otherwise announce one key and activate another.
-        accessibilityProvider.notifyLayoutChanged()
     }
 
     /** Half-width of the horizontal chord of a circle of [radius] at vertical offset [dy]. */
