@@ -185,7 +185,7 @@ class WearKeyImeService : InputMethodService() {
         }
 
         if (!suggestionsDisabled) {
-            surfaceView?.withEmojiPanel { panel ->
+            surfaceView?.emojiPanel?.let { panel ->
                 panel.noteUsed(emoji)
                 emojiRecentsStore.save(panel.recentsSnapshot())
             }
@@ -199,7 +199,8 @@ class WearKeyImeService : InputMethodService() {
         view.keyGrid.swipeListener = KeyGridView.OnSwipeListener { xs, ys, count ->
             handleSwipe(xs, ys, count)
         }
-        view.bindClipboard(clipboardStore, object : ClipboardPanelView.Listener {
+        view.clipboardPanel.bind(clipboardStore)
+        view.clipboardPanel.listener = object : ClipboardPanelView.Listener {
             override fun onPaste(text: String) {
                 pasteText(text)
                 view.hideClipboard()
@@ -207,27 +208,27 @@ class WearKeyImeService : InputMethodService() {
 
             override fun onPin(text: String, pinned: Boolean) {
                 clipboardStore.pin(text, pinned)
-                view.refreshClipboardPanel()
+                view.clipboardPanel.refresh()
             }
 
             override fun onDelete(text: String) {
                 clipboardStore.delete(text)
-                view.refreshClipboardPanel()
+                view.clipboardPanel.refresh()
             }
 
             override fun onClearAll() {
                 clipboardStore.clearAll()
-                view.refreshClipboardPanel()
+                view.clipboardPanel.refresh()
             }
 
             override fun onClose() {
                 view.hideClipboard()
             }
-        })
-        view.bindEmoji(
-            recentsProvider = { emojiRecentsStore.load() },
-            listener = EmojiPanelView.OnEmojiListener { emoji -> commitEmoji(emoji) }
-        )
+        }
+        view.emojiPanel.restoreRecents(emojiRecentsStore.load())
+        view.emojiPanel.onEmojiListener = EmojiPanelView.OnEmojiListener { emoji ->
+            commitEmoji(emoji)
+        }
 
         view.suggestionStrip.onSuggestionListener =
             SuggestionStripView.OnSuggestionListener { word -> replaceCurrentWord(word) }
