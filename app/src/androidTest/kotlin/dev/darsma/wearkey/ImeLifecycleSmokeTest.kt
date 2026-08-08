@@ -135,10 +135,15 @@ class ImeLifecycleSmokeTest {
         ).apply { fontScale *= 1.3f }
         service.onConfigurationChanged(config)
 
-        // Restarting=true is what the framework passes after a config change, and it must not wipe
-        // text the user has already entered.
-        service.onStartInputView(editorInfo(), true)
+        // The configuration callback itself must leave the mirror intact.
         assertEquals("abc", service.editorTextForTest())
+
+        // A production restart restores from InputConnection.getExtractedText(). This detached
+        // service deliberately has no host editor/InputConnection, so it cannot simulate that half
+        // of the contract. It must reset safely rather than retaining stale text from a field it can
+        // no longer inspect; real host-field restoration is covered by the context-matrix test.
+        service.onStartInputView(editorInfo(), true)
+        assertEquals("", service.editorTextForTest())
     }
 
     @Test
