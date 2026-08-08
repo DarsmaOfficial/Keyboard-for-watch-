@@ -315,8 +315,12 @@ cold-process appearance does not. The status remains FAIL under the stricter int
 - **Emoji layer (§11 v0.3)** — scrolling categorised grid, recents, platform `NotoColorEmoji.ttf`
   with no bundled font. 9 unit tests.
 - **First-run tutorial (§11.5)** — five cards, launched once from Settings, re-openable there.
-- **Instrumented IME lifecycle smoke test (§9)** — 6 tests. CI compiles them; running them needs a
-  device, so that belongs to the on-device pass.
+- **Instrumented IME lifecycle smoke test (§9)** — ✅ **6/6 passed on the physical watch**
+  (0.648 s). Running it exposed two invalid harness assumptions that compilation could not catch:
+  service construction was off the main Looper, and a detached service was claimed to type despite
+  having no `InputConnection`. Commits `534e5f0`, `0320a89`, and `5d95aaf` made the suite match real
+  lifecycle affinity and narrowed detached tests to behavior they can truthfully exercise. Real
+  editor delivery remains part of the context matrix.
 - **Themes (§11 v0.3)** — Midnight / High contrast / Amber, all AMOLED-black by test. Contrast
   verified with WCAG relative luminance rather than by eye; high contrast uses outlines, not white
   fills, because a large static bright region is what §8 warns against.
