@@ -45,8 +45,18 @@ class ImeLifecycleSmokeTest {
             imeOptions = EditorInfo.IME_ACTION_DONE
         }
 
+    /**
+     * InputMethodService owns a Dialog/Window and therefore must be created on the main Looper.
+     * AndroidJUnitRunner invokes ordinary @Test methods on its instrumentation thread; running the
+     * service there fails in framework setup before any WearKey assertion executes. Keep each
+     * complete lifecycle scenario on the real UI thread, matching production callback affinity.
+     */
+    private fun onMain(block: () -> Unit) {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(block)
+    }
+
     @Test
-    fun createsAnInputViewWithBothRequiredSurfaces() {
+    fun createsAnInputViewWithBothRequiredSurfaces() = onMain {
         val service = service()
         service.onCreate()
         val view = service.onCreateInputView()
@@ -60,7 +70,7 @@ class ImeLifecycleSmokeTest {
     }
 
     @Test
-    fun showAndHideCyclesLeaveTheViewUsable() {
+    fun showAndHideCyclesLeaveTheViewUsable() = onMain {
         val service = service()
         service.onCreate()
         service.onCreateInputView()
@@ -77,7 +87,7 @@ class ImeLifecycleSmokeTest {
     }
 
     @Test
-    fun textDoesNotCarryBetweenFields() {
+    fun textDoesNotCarryBetweenFields() = onMain {
         val service = service()
         service.onCreate()
         service.onCreateInputView()
@@ -94,7 +104,7 @@ class ImeLifecycleSmokeTest {
     }
 
     @Test
-    fun maskedFieldNeverHoldsPlaintext() {
+    fun maskedFieldNeverHoldsPlaintext() = onMain {
         val service = service()
         service.onCreate()
         service.onCreateInputView()
@@ -111,7 +121,7 @@ class ImeLifecycleSmokeTest {
     }
 
     @Test
-    fun survivesConfigurationChange() {
+    fun survivesConfigurationChange() = onMain {
         val service = service()
         service.onCreate()
         service.onCreateInputView()
@@ -132,7 +142,7 @@ class ImeLifecycleSmokeTest {
     }
 
     @Test
-    fun repeatedInputViewCreationDoesNotAccumulateState() {
+    fun repeatedInputViewCreationDoesNotAccumulateState() = onMain {
         val service = service()
         service.onCreate()
 
