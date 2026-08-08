@@ -23,6 +23,23 @@ class KeyGeometry(
     fun x(i: Int): Float = xs[i]
     fun y(i: Int): Float = ys[i]
 
+    /** Nearest letter centre to a raw pointer coordinate, for endpoint evidence. */
+    fun nearestLetter(x: Float, y: Float): Char? {
+        if (letters.isEmpty()) return null
+        var best = 0
+        var bestDistance = Float.MAX_VALUE
+        for (i in letters.indices) {
+            val dx = x - xs[i]
+            val dy = y - ys[i]
+            val distance = dx * dx + dy * dy
+            if (distance < bestDistance) {
+                bestDistance = distance
+                best = i
+            }
+        }
+        return letters[best]
+    }
+
     companion object {
         fun of(letters: String, xs: FloatArray, ys: FloatArray): KeyGeometry =
             KeyGeometry(letters.toCharArray(), xs, ys)
@@ -58,6 +75,7 @@ class SwipeRecognizer(
 ) {
     private val dtw = Dtw()
     private var templates: Array<SwipePath?> = emptyArray()
+    private var geometry: KeyGeometry? = null
 
     // Reusable scratch for template construction; sized to the longest word once.
     private var scratchX = FloatArray(0)
@@ -77,6 +95,7 @@ class SwipeRecognizer(
      * Cyrillic word simply has no path on a QWERTY grid.
      */
     fun setGeometry(geometry: KeyGeometry) {
+        this.geometry = geometry
         var longest = 0
         for (w in vocabulary) if (w.length > longest) longest = w.length
         if (scratchX.size < longest) {
@@ -108,7 +127,12 @@ class SwipeRecognizer(
      * The scan keeps a running worst-accepted distance and feeds it to DTW as an early-abandon
      * ceiling, so most of the vocabulary is rejected after a few rows rather than fully aligned.
      */
-    fun recognise(path: SwipePath, limit: Int = 4): List<SwipeCandidate> {
+    fun recognise(
+        path: SwipePath,
+        limit: Int = 4,
+        startLetter: Char? = null,
+        endLetter: Char? = null
+    ): List<SwipeCandidate> {
         if (templates.isEmpty()) return emptyList()
 
         val bestWords = arrayOfNulls<String>(limit)
@@ -124,7 +148,14 @@ class SwipeRecognizer(
             val shape = dtw.distance(path, template, ceiling)
             if (shape == Float.MAX_VALUE) continue
 
-            val score = shape - frequencyWeight * ln((frequencies[i] + 1).toFloat())
+            // Normalising a path to its own bounding box intentionally discards absolute position.
+            // That is good for general shape matching, but it makes `hello` and `help` unusually
+            // hard to separate: both have the same early route, while their last key differs.
+            // Raw start/end keys restore that lost evidence without changing DTW's rate tolerance.
+            var endpointPenalty = 0f
+            if (startLetter != null && word.firstOrNull() != startLetter) endpointPenalty += ENDPOINT_PENALTY
+            if (endLetter != null && word.lastOrNull() != endLetter) endpointPenalty += ENDPOINT_PENALTY
+            val score = shape - frequencyWeight * ln((frequencies[i] + 1).toFloat()) + endpointPenalty
 
             var slot = limit - 1
             if (score >= bestScores[slot]) continue
@@ -154,5 +185,8 @@ class SwipeRecognizer(
          * negligible against a genuinely different path.
          */
         const val DEFAULT_FREQUENCY_WEIGHT = 0.05f
+
+        /** A clear endpoint mismatch must not be outweighed by a frequency-only preference. */
+        const val ENDPOINT_PENALTY = 1.0f
     }
 }

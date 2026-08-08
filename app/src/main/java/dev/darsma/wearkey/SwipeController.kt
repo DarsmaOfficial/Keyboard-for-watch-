@@ -27,6 +27,7 @@ import dev.darsma.wearkey.uiwear.KeyGridView
 class SwipeController(private val spellEngine: SpellEngine) {
 
     private var recognizer: SwipeRecognizer? = null
+    private var geometry: KeyGeometry? = null
     private var geometrySignature: String? = null
 
     /** True when a gesture can currently be recognised. */
@@ -53,6 +54,7 @@ class SwipeController(private val spellEngine: SpellEngine) {
         val signature = "$letters@${grid.width}x${grid.height}"
         if (signature == geometrySignature && recognizer != null) return
 
+        val keyGeometry = KeyGeometry.of(letters, xs, ys)
         val (words, freqs) = spellEngine.vocabularySnapshot(MAX_TEMPLATES)
         if (words.isEmpty()) {
             recognizer = null
@@ -60,15 +62,15 @@ class SwipeController(private val spellEngine: SpellEngine) {
             return
         }
 
-        recognizer = SwipeRecognizer(words, freqs).also {
-            it.setGeometry(KeyGeometry.of(letters, xs, ys))
-        }
+        recognizer = SwipeRecognizer(words, freqs).also { it.setGeometry(keyGeometry) }
+        geometry = keyGeometry
         geometrySignature = signature
     }
 
     /** Drops templates, e.g. when the dictionary unloads on a language switch. */
     fun clear() {
         recognizer = null
+        geometry = null
         geometrySignature = null
     }
 
@@ -82,7 +84,12 @@ class SwipeController(private val spellEngine: SpellEngine) {
         val r = recognizer ?: return emptyList()
         val path = SwipePath.fromSamples(xs, ys, count, minLength = MIN_SWIPE_DP * density)
             ?: return emptyList()
-        return r.recognise(path).map { it.word }
+        val g = geometry ?: return emptyList()
+        return r.recognise(
+            path,
+            startLetter = g.nearestLetter(xs[0], ys[0]),
+            endLetter = g.nearestLetter(xs[count - 1], ys[count - 1])
+        ).map { it.word }
     }
 
     companion object {

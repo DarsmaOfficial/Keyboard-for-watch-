@@ -131,6 +131,14 @@ class SwipeRecognizerTest {
     }
 
     @Test
+    fun `endpoint evidence separates hello from help`() {
+        val r = recogniser("hello", "help")
+        // The normalized shapes are close, but a finger ending at O must not resolve to HELP.
+        assertEquals("hello", r.recognise(swipe("hello"), endLetter = 'o').first().word)
+        assertEquals("help", r.recognise(swipe("help"), endLetter = 'p').first().word)
+    }
+
+    @Test
     fun `word absent from the layout yields no template rather than crashing`() {
         // Cyrillic word against a Latin grid — the mixed-vocabulary case.
         val r = recogniser("привет", "hello")
