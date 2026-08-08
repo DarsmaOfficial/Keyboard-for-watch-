@@ -36,7 +36,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run unit tests
-        run: ./gradlew :ime-core:test :dict:test :layout-engine:test :engine-swipe:test :app:testDebugUnitTest --stacktrace --no-daemon
+        run: ./gradlew :ime-core:test :dict:test :layout-engine:test :engine-swipe:test :ui-wear:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
