@@ -47,9 +47,9 @@ and correct it before committing more text.
 - **Input-aware safety** — password/PIN previews use bullets and never retain plaintext.
 
 > [!IMPORTANT]
-> WearKey is usable, but it is not yet fully hardware-certified. See
-> [`STATUS.md`](STATUS.md) for the measured facts, deferred device checks, and the strict
-> true-cold-start gate that currently fails.
+> WearKey is usable, but it is not yet fully hardware-certified and does **not** provide
+> TalkBack touch-exploration support. See [`STATUS.md`](STATUS.md) for measured facts,
+> deferred device checks, and the strict true-cold-start gate that currently fails.
 
 ## Privacy is an implementation detail, not a slogan
 
