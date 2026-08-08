@@ -33,8 +33,7 @@ class LaunchKeyboardActivity : Activity() {
         val view = KeyboardSurfaceView(this)
         view.bind(editorState)
         view.keyGrid.onKeyListener = KeyGridView.OnKeyListener { action -> handleKey(action) }
-        view.clipboardPanel.bind(clipboardStore)
-        view.clipboardPanel.listener = object : ClipboardPanelView.Listener {
+        view.bindClipboard(clipboardStore, object : ClipboardPanelView.Listener {
             override fun onPaste(text: String) {
                 editorState.commitText(text)
                 view.hideClipboard()
@@ -42,23 +41,23 @@ class LaunchKeyboardActivity : Activity() {
 
             override fun onPin(text: String, pinned: Boolean) {
                 clipboardStore.pin(text, pinned)
-                view.clipboardPanel.refresh()
+                view.refreshClipboardPanel()
             }
 
             override fun onDelete(text: String) {
                 clipboardStore.delete(text)
-                view.clipboardPanel.refresh()
+                view.refreshClipboardPanel()
             }
 
             override fun onClearAll() {
                 clipboardStore.clearAll()
-                view.clipboardPanel.refresh()
+                view.refreshClipboardPanel()
             }
 
             override fun onClose() {
                 view.hideClipboard()
             }
-        }
+        })
         surfaceView = view
         setContentView(view)
 
