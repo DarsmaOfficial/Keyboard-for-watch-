@@ -47,8 +47,8 @@ class SwipeController(private val spellEngine: SpellEngine) {
             return
         }
 
-        val geometry = grid.letterGeometry() ?: return
-        val (letters, xs, ys) = geometry
+        val gridGeometry = grid.letterGeometry() ?: return
+        val (letters, xs, ys) = gridGeometry
 
         // Layout identity plus grid size: either changing invalidates every template.
         val signature = "$letters@${grid.width}x${grid.height}"
