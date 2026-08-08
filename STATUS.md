@@ -26,7 +26,7 @@ never measured is not a gate that passed.
 | No arm64 libraries | 0 | **0** | ✅ verified |
 | No `androidx.compose.*` in keyboard path | 0 | **0** | ✅ CI-enforced |
 | Permissions declared | 0 | **0** — not even `INTERNET` | ✅ verified |
-| Composed text always visible | 100% of fields | verified in browser URL bar | ⚠️ partial — full context matrix pending |
+| Composed text always visible | 100% of fields | browser URL + real plain/multiline/password/number/search fields pass | ⚠️ partial — WhatsApp + notification reply pending |
 | Frame time, 95th percentile | ≥ 95% under 16.6 ms | **p95 = 2.51 ms, 0.39% over budget** (259 frames) | ✅ verified |
 | Cold IME show | < 150 ms | warm median **55.5 ms**; true-cold optimized median **372.2 ms** (n=5 each) | ❌ **literal cold gate fails; resident show passes** |
 | Text entry rate | ≥ 15 WPM | never measured | ❌ **not measured** |
@@ -185,9 +185,12 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
 ### Unproven — measurement, not code
 
 1. **Cold IME show < 150 ms (§14).** Never measured.
-3. **Context matrix (§14).** Verified in the browser URL bar only. The spec requires notification
-   reply, WhatsApp, plain `EditText`, password field, number field and search field — these exercise
-   genuinely different code paths.
+3. **Context matrix (§14).** Browser URL plus real plain, multiline, password, signed/decimal
+   number, and search-action `EditText` contexts now pass on the physical watch. The host field and
+   composition strip stayed visible together; password mirrored bullets only; number switched to
+   the numeric-aware grid; search Enter performed `IME_ACTION_SEARCH` without inserting a newline.
+   **Still pending:** WhatsApp and notification reply/RemoteInput paths, which require a safe live
+   conversation or an active reply-capable notification and must not send anything externally.
 4. **Text entry rate and error rate (§14).** Requires the MacKenzie & Soukoreff phrase set, plus a
    Gboard baseline for comparison. The spec is explicit that improvement claims must be relative to
    measured data.
