@@ -31,8 +31,17 @@ class KeyboardSurfaceView @JvmOverloads constructor(
     val compositionStrip: CompositionStripView
     val suggestionStrip: SuggestionStripView
     val keyGrid: KeyGridView
-    val clipboardPanel: ClipboardPanelView
-    val emojiPanel: EmojiPanelView
+
+    // Optional panels are deliberately absent from the first-frame hierarchy. Perfetto on the
+    // physical watch attributed a large part of true-cold startup to initial class/view creation,
+    // while both panels start GONE. Constructing them on first use removes work the user cannot
+    // see without changing the shared surface or either entry point's behaviour.
+    private var clipboardPanelView: ClipboardPanelView? = null
+    private var emojiPanelView: EmojiPanelView? = null
+    private var clipboardStore: dev.darsma.wearkey.imecore.ClipboardStore? = null
+    private var clipboardListener: ClipboardPanelView.Listener? = null
+    private var emojiRecentsProvider: (() -> List<String>)? = null
+    private var emojiListener: EmojiPanelView.OnEmojiListener? = null
 
     init {
         setBackgroundColor(Color.BLACK)
@@ -64,21 +73,6 @@ class KeyboardSurfaceView @JvmOverloads constructor(
         }
         addView(keyGrid)
 
-        // Occupies the same slot as the key grid — on a 233dp round display there is no room to
-        // show both at once, so the clipboard panel replaces the keys while it is open.
-        clipboardPanel = ClipboardPanelView(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
-            visibility = GONE
-        }
-        addView(clipboardPanel)
-
-        // Same slot again, same reason: the emoji grid needs the full key area to show glyphs at a
-        // tappable size, so it replaces the keys rather than sharing space with them.
-        emojiPanel = EmojiPanelView(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
-            visibility = GONE
-        }
-        addView(emojiPanel)
     }
 
     /** Wires both sub-views to the given state in one call — keeps entry points' code trivial. */
@@ -94,22 +88,80 @@ class KeyboardSurfaceView @JvmOverloads constructor(
         compositionStrip.onCaretRequestListener = null
     }
 
+    /** Supplies clipboard state without constructing its hidden panel on the first frame. */
+    fun bindClipboard(
+        store: dev.darsma.wearkey.imecore.ClipboardStore,
+        listener: ClipboardPanelView.Listener
+    ) {
+        clipboardStore = store
+        clipboardListener = listener
+        clipboardPanelView?.apply {
+            bind(store)
+            this.listener = listener
+        }
+    }
+
+    /** Supplies emoji state without loading its catalogue or panel until the user opens it. */
+    fun bindEmoji(
+        recentsProvider: () -> List<String>,
+        listener: EmojiPanelView.OnEmojiListener
+    ) {
+        emojiRecentsProvider = recentsProvider
+        emojiListener = listener
+        emojiPanelView?.onEmojiListener = listener
+    }
+
+    private fun clipboardPanel(): ClipboardPanelView {
+        clipboardPanelView?.let { return it }
+        return ClipboardPanelView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
+            visibility = GONE
+            clipboardStore?.let(::bind)
+            listener = clipboardListener
+            this@KeyboardSurfaceView.addView(this)
+            clipboardPanelView = this
+        }
+    }
+
+    private fun emojiPanel(): EmojiPanelView {
+        emojiPanelView?.let { return it }
+        return EmojiPanelView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
+            visibility = GONE
+            restoreRecents(emojiRecentsProvider?.invoke().orEmpty())
+            onEmojiListener = emojiListener
+            this@KeyboardSurfaceView.addView(this)
+            emojiPanelView = this
+        }
+    }
+
+    /** Runs [block] only if the emoji panel has already been opened and constructed. */
+    fun withEmojiPanel(block: (EmojiPanelView) -> Unit) {
+        emojiPanelView?.let(block)
+    }
+
+    /** Refreshes an existing clipboard panel; unopened panels read current state when created. */
+    fun refreshClipboardPanel() {
+        clipboardPanelView?.refresh()
+    }
+
     /** True while the clipboard history panel is showing instead of the key grid. */
     val isClipboardOpen: Boolean
-        get() = clipboardPanel.visibility == VISIBLE
+        get() = clipboardPanelView?.visibility == VISIBLE
 
     fun showClipboard() {
+        val clipboardPanel = clipboardPanel()
         clipboardPanel.refresh()
         // Symmetric with showEmoji: exactly one panel may occupy the key slot. Opening the
         // clipboard from the emoji layer previously left both VISIBLE, and which one the user saw
         // depended on child order rather than on intent.
-        emojiPanel.visibility = GONE
+        emojiPanelView?.visibility = GONE
         keyGrid.visibility = GONE
         clipboardPanel.visibility = VISIBLE
     }
 
     fun hideClipboard() {
-        clipboardPanel.visibility = GONE
+        clipboardPanelView?.visibility = GONE
         keyGrid.visibility = VISIBLE
     }
 
@@ -119,18 +171,19 @@ class KeyboardSurfaceView @JvmOverloads constructor(
 
     /** True while the emoji layer is showing instead of the key grid. */
     val isEmojiOpen: Boolean
-        get() = emojiPanel.visibility == VISIBLE
+        get() = emojiPanelView?.visibility == VISIBLE
 
     fun showEmoji() {
+        val emojiPanel = emojiPanel()
         // Closing the clipboard first keeps the invariant that exactly one panel occupies the slot;
         // without it both could be VISIBLE and the later child would silently win.
-        clipboardPanel.visibility = GONE
+        clipboardPanelView?.visibility = GONE
         keyGrid.visibility = GONE
         emojiPanel.visibility = VISIBLE
     }
 
     fun hideEmoji() {
-        emojiPanel.visibility = GONE
+        emojiPanelView?.visibility = GONE
         keyGrid.visibility = VISIBLE
     }
 
