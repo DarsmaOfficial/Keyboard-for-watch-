@@ -29,6 +29,11 @@ class SettingsStore(context: Context) {
         get() = prefs.getString(KEY_THEME, null)
         set(value) = prefs.edit().putString(KEY_THEME, value).apply()
 
+    /** Experimental deferred word resolution (§7.2b); opt-in until hardware evaluation passes. */
+    var spatialTypingEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SPATIAL_TYPING, false)
+        set(value) = prefs.edit().putBoolean(KEY_SPATIAL_TYPING, value).apply()
+
     /** True once the first-run tutorial has been completed or skipped (spec §11.5). */
     fun hasSeenTutorial(): Boolean = prefs.getBoolean(KEY_TUTORIAL_SEEN, false)
 
@@ -109,6 +114,7 @@ class SettingsStore(context: Context) {
         private const val KEY_LAST_CLEAR = "last_clear_ms"
         private const val KEY_TUTORIAL_SEEN = "tutorial_seen"
         private const val KEY_THEME = "theme_id"
+        private const val KEY_SPATIAL_TYPING = "spatial_typing_enabled"
         private const val KEY_DRIFT_PX = "touch_drift_px"
         private const val KEY_DRIFT_EXPONENT = "touch_drift_exponent"
         private const val KEY_PENDING_DRIFT_PX = "pending_drift_px"

@@ -70,7 +70,19 @@ class CalibrationActivity : Activity() {
                 //
                 // Pending is not the same as applied: it changes no typing behaviour until the
                 // user accepts it. It only guarantees the work survives long enough to be offered.
-                fit?.let { SettingsStore(this).savePendingCalibration(it.maxRadialDriftPx, it.driftExponent, it.improvementPercent) }
+                val store = SettingsStore(this)
+                if (fit?.isImprovement == true) {
+                    store.savePendingCalibration(
+                        fit.maxRadialDriftPx,
+                        fit.driftExponent,
+                        fit.improvementPercent
+                    )
+                } else {
+                    // A non-improving fit is rejected, not merely hidden on this screen. Keeping
+                    // it pending would offer an Apply button after reopening calibration and let
+                    // the user install the exact correction we just proved makes taps worse.
+                    store.clearPendingCalibration()
+                }
                 showResult(fit)
             }
         }
@@ -86,6 +98,12 @@ class CalibrationActivity : Activity() {
         val drift = store.pendingDriftPx ?: return false
         val exponent = store.pendingDriftExponent ?: return false
         val improvement = store.pendingImprovementPercent
+        if (improvement <= 0f) {
+            // Defensive cleanup for old builds and interrupted sessions. A pending record is not
+            // trustworthy merely because all three keys exist; only a measured gain is adoptable.
+            store.clearPendingCalibration()
+            return false
+        }
 
         root.removeAllViews()
         root.addView(label(getString(R.string.calibration_pending_title), 14f, bold = true))

@@ -107,9 +107,11 @@ squares in log space.
 Pipeline verified by injecting a **known** 8.0 px drift with exponent 2.0 — the fitter recovered
 7.05 px / 1.75 and reported mean miss **3.1 px → 0.3 px (92% better)**.
 
-⚠️ **The constants on the device are still the defaults.** The synthetic fit was deliberately
-cleared, because `adb input` takes integer coordinates only and cannot reproduce finger-pad
-geometry. Real values need a human session — one minute, via *Settings → Калибровка касаний*.
+✅ **Real-finger calibration was completed on the physical watch.** Natural taps measured mean
+miss **13.4 px** with the shipped model. The fitted candidate (11.52 px radial drift, exponent
+1.02) made it **16.6 px**, a **23.5% regression**, so the app correctly rejected it and retained
+the defaults. This closes the §7.2b calibration precondition: there is no measured basis for a
+personalised radial correction on this user/device.
 
 ---
 
@@ -346,10 +348,8 @@ cold-process appearance does not. The status remains FAIL under the stricter int
 
 ### Not started — code
 
-1. **Spatial prediction UI mode (§7.2b).** The *resolver* is built and tested; the mode is not
-   wired up, and deliberately so. §7.2b says to prototype it "after the touch model is calibrated
-   on real hardware", and calibration has not been run on the watch — building a mode on
-   uncalibrated constants would violate the precondition the spec itself sets.
+1. **Spatial prediction UI mode (§7.2b).** The resolver is built and tested, and the real-hardware
+   calibration precondition is now satisfied. Wiring and physical evaluation are next.
 *(Release signing and the offline/reproducible build are both done — see the verified list below.)* No release keystore yet, and the
    "builds offline from a clean machine" claim needs dependency locking and checksums to be a fact
    rather than an aspiration.

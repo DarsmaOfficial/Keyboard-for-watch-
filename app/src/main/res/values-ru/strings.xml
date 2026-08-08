@@ -78,6 +78,9 @@
     <string name="tutorial_privacy_body">Нет доступа в интернет, микрофона и аналитики. Всё работает на устройстве.</string>
     <string name="settings_tutorial">Как печатать</string>
     <string name="settings_theme">Тема</string>
+    <string name="settings_spatial_typing">Предиктивный ввод без взгляда</string>
+    <string name="settings_spatial_typing_on">Вкл. — слово уточняется по пробелу</string>
+    <string name="settings_spatial_typing_off">Выкл.</string>
     <string name="theme_midnight">Полночь</string>
     <string name="theme_high_contrast">Высокий контраст</string>
     <string name="theme_amber">Янтарь</string>
