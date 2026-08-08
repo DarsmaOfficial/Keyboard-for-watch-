@@ -439,9 +439,17 @@ class WearKeyImeService : InputMethodService() {
     /** The composed text as the user would see it — bullets, not plaintext, in masked fields. */
     internal fun editorTextForTest(): String = editorState.text
 
-    /** Types through the same path a key press takes, so the test cannot bypass real logic. */
-    internal fun typeForTest(text: String) {
-        for (c in text) handleKey(KeyGridView.KeyAction.Character(c))
+    /**
+     * Seeds mirrored editor state for detached lifecycle tests.
+     *
+     * A service constructed directly by instrumentation has no framework InputConnection, so it
+     * cannot truthfully exercise [handleKey] — production input correctly returns when no target
+     * editor exists. This seam establishes lifecycle preconditions only; key/commit semantics are
+     * covered by EditorStateTest and CommitInvariantTest, while real editor delivery belongs to the
+     * context-matrix tests.
+     */
+    internal fun seedEditorForTest(text: String) {
+        editorState.commitText(text)
     }
 
     private fun handleKey(action: KeyGridView.KeyAction) {
