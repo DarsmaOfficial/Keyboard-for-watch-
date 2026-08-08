@@ -141,6 +141,7 @@ class SwipeRecognizer(
 
         for (i in templates.indices) {
             val template = templates[i] ?: continue
+            val word = vocabulary[i]
 
             // Only abandon early once the shortlist is full — before that every candidate is worth
             // a full evaluation, and an aggressive ceiling would discard the eventual winner.
