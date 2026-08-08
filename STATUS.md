@@ -202,48 +202,10 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
 
 ### Resolved since the first draft of this document
 
-- **TalkBack virtual view hierarchy (§11.5)** — ⚠️ **built, and demonstrably not yet working.**
-  Each key is an `AccessibilityNodeInfo` node in deliberate traversal order, activation arrives as
-  `ACTION_CLICK`, and hover routing was added. Written against the framework rather than
-  `ExploreByTouchHelper`, whose POM pulls `androidx.core` (§12).
-
-  **Tested with TalkBack actually running, and it failed.** A single tap on `h` — which under touch
-  exploration must only announce the key — typed `h` into the field. Repeated across three keys:
-  `hqb`. This is exactly the failure §11.5 names, and it makes the keyboard unusable with a screen
-  reader, because the only way to identify a key is to type it.
-
-  **The control test was weaker than first claimed, and the correction matters.** It was recorded
-  as proving the harness sound: a single `adb input tap` on a settings row moved TalkBack's focus
-  ring without activating the row. But the same screenshot shows the row's value had *changed* —
-  the tap moved focus **and** activated. So `adb shell input tap` does not reliably reproduce touch
-  exploration, and the keyboard result it produced cannot be trusted either way. The bug may be
-  real or may be an artefact of injected input bypassing `TouchExplorer`; on the current evidence
-  that is genuinely undetermined, and the earlier "definitive" framing was wrong.
-
-  Three fixes attempted so far, each addressing a real defect but none sufficient:
-  1. `dispatchHoverEvent` routing — the provider had no hover handling at all, so exploration
-     gestures fell through to `onTouchEvent`.
-  2. `importantForAccessibility = YES` — a Canvas view with no text resolves AUTO to *not
-     important*, which excludes it from the tree entirely.
-  3. Removing the `contentDescription` added in (2) — a labelled view is treated as a leaf, so the
-     framework stops descending and never asks for the virtual children.
-
-  **`hasChildren=false` was also over-read.** In `AccessibilityWindowInfo` that field reports child
-  *windows*, not child nodes — an IME window legitimately has none, so it is not the signal it was
-  treated as. `uiautomator dump` returning nothing likewise proves little: it excludes IME windows
-  by design, which is already documented in the gotchas below.
-
-  So of the three "diagnostics" used, one was misread, one was inapplicable, and the control was
-  invalid. The three code changes are still defensible on their own merits — a provider with no
-  hover routing genuinely cannot support exploration, and an AUTO-importance Canvas view genuinely
-  is dropped from the tree — but none of them has been *shown* to fix anything.
-
-  **How to test this properly** (needs TalkBack on, so it needs the user's agreement):
-  1. Enable TalkBack, then explore with a **real finger**, not `adb input tap`.
-  2. Read the node tree with `dumpsys accessibility a11ycache` or an
-     `AccessibilityService`-based dump, which unlike `uiautomator` can see IME windows.
-  3. The pass condition is that a finger resting on a key announces it and leaves the field
-     unchanged; activation happens only on double-tap.
+- **TalkBack virtual-key support (§11.5)** — **removed at the user's request.** The experimental
+  `AccessibilityNodeProvider`, hover routing and spoken-key labels were removed after the feature
+  could not be verified as safe for touch exploration. WearKey therefore makes no screen-reader
+  touch-exploration claim; TalkBack is disabled on the test watch.
 - **Frame-time instrumentation (§14)** — ✅ **built and measured.** `onDraw` is timed directly into
   a fixed 4096-sample buffer, read from a settings screen. The previous implementation called
   `invalidate()` every frame, which measured a synthetic 60 fps loop rather than the keyboard's real
@@ -355,10 +317,6 @@ inferred from that status.
 ## Suggested order
 
 1. **Frame timing instrumentation** — small, self-contained, closes the last Phase 2/3 gate.
-2. **Verify TalkBack on-device** — the node hierarchy is built but has never been driven by a real
-   screen reader; enabling TalkBack and exploring the grid is the only way to know it behaves. Was
-   the most significant correctness gap, and accessibility work gets
-   harder the longer the view grows.
 3. **Context matrix** — cheap, and it tests the headline requirement in the places §4.5 says
    actually matter.
 4. **Swipe typing** — the big feature, best started once the above are settled.

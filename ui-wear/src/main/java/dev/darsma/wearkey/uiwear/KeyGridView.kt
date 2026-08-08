@@ -993,54 +993,13 @@ class KeyGridView @JvmOverloads constructor(
     }
 
     /**
-     * Spoken description for a key (spec §11.5 accessibility). Symbols get words rather than
-     * the raw glyph, because TalkBack reads "⌫" as nothing useful.
-     */
-    private fun describeKey(key: Key): CharSequence = when (val a = key.action) {
-        is KeyAction.Character -> a.char.toString()
-        KeyAction.Space -> context.getString(R.string.a11y_space)
-        KeyAction.Backspace -> context.getString(R.string.a11y_backspace)
-        KeyAction.Enter -> actionLabel ?: context.getString(R.string.a11y_enter)
-        KeyAction.SwitchLanguage -> context.getString(R.string.a11y_switch_language)
-        KeyAction.Clipboard -> context.getString(R.string.a11y_clipboard)
-        KeyAction.Emoji -> context.getString(R.string.a11y_emoji_key)
-        KeyAction.SymbolLayer ->
-            if (symbolLayerVisible) context.getString(R.string.a11y_letters)
-            else context.getString(R.string.a11y_symbols)
-        KeyAction.Shift -> when {
-            symbolLayerVisible -> context.getString(R.string.a11y_more_symbols)
-            shiftState == ShiftState.CAPS_LOCK -> context.getString(R.string.a11y_caps_lock)
-            shiftState == ShiftState.SHIFTED -> context.getString(R.string.a11y_shift_on)
-            else -> context.getString(R.string.a11y_shift)
-        }
-    }
-
-    /**
-     * Announces what just happened, so screen-reader users get confirmation of a committed
-     * character or a layer change rather than silence (spec §11.5: "announce state changes,
-     * not just key labels").
-     *
-     * This is confirmation *after* an action. Guidance *before* one — reading a key while the
-     * finger explores it, without typing it — is the accessibility provider's job, below.
-     */
-    private fun announceForKey(key: Key) {
-        if (!isAccessibilityActive()) return
-        announceForAccessibility(describeKey(key))
-    }
-
-    /**
      * Everything that happens when a key is activated: announcement, haptics, local state, then the
      * host callback.
      *
-     * Deliberately the single path for *both* a finger release and a screen-reader double-tap. When
-     * this logic lived inline in the touch handler, an accessibility activation would have had to
-     * duplicate it — and duplicated interaction logic drifts, so shift or the symbol layer would
-     * eventually behave differently depending on whether TalkBack was running. That class of bug is
-     * invisible to anyone not using a screen reader, which is precisely why it must be prevented
-     * structurally rather than by care.
+     * This is the single activation path for ordinary touch input. Keeping state transitions here
+     * prevents shift, symbol-layer and haptic behaviour from drifting apart across touch paths.
      */
     private fun handleKeyAction(key: Key) {
-        announceForKey(key)
         // Haptics fire on activation, matching where the action actually happens (spec §8.1).
         haptics.perform(
             when (key.action) {
@@ -1077,84 +1036,6 @@ class KeyGridView @JvmOverloads constructor(
             else -> Unit
         }
         onKeyListener?.onKey(key.action)
-    }
-
-    // --- Accessibility node tree (spec §11.5) ---------------------------------------------------
-    //
-    // Without this, a Canvas-drawn grid is one blank rectangle to TalkBack: the user can tell a
-    // keyboard is present but cannot explore it, and every exploratory touch risks typing a
-    // character. The provider exposes each key as its own focusable, clickable node, so touch
-    // exploration reads keys aloud and activation requires an explicit double-tap.
-
-    private val accessibilityProvider by lazy {
-        KeyAccessibilityProvider(
-            host = this,
-            keyCount = { keys.size },
-            keyBounds = { id ->
-                keys.getOrNull(id)?.let { key ->
-                    android.graphics.Rect(
-                        key.rect.left.toInt(),
-                        key.rect.top.toInt(),
-                        key.rect.right.toInt(),
-                        key.rect.bottom.toInt()
-                    )
-                }
-            },
-            keyDescription = { id -> keys.getOrNull(id)?.let { describeKey(it) } },
-            onKeyActivated = { id ->
-                keys.getOrNull(id)?.let { key ->
-                    // Route through the same handler a real tap uses, so shift, layer switching and
-                    // haptics behave identically whether or not a screen reader is driving.
-                    handleKeyAction(key)
-                }
-            }
-        )
-    }
-
-    init {
-        // Without this the entire accessibility provider is dead code, and it fails silently.
-        //
-        // A custom View that draws its content on a Canvas has no text and no contentDescription,
-        // so IMPORTANT_FOR_ACCESSIBILITY_AUTO resolves to *not important*: the framework excludes
-        // the view from the accessibility tree and therefore never calls
-        // getAccessibilityNodeProvider() at all. Verified on the watch — with TalkBack running,
-        // `uiautomator dump` contained zero nodes from this package while the IME was visible, and
-        // exploring a key typed it because the touch was never converted into a hover.
-        //
-        // Declaring the view important is what makes the framework ask for the provider, at which
-        // point the virtual key nodes and hover routing start working.
-        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
-
-        // Deliberately NO contentDescription on the host, and deliberately not focusable.
-        //
-        // Both are tempting and both break the virtual tree. A view carrying a contentDescription
-        // is treated by the framework as a labelled *leaf*: it announces that label and stops
-        // descending, so the per-key children are never queried. Making the host itself focusable
-        // has the same effect for exploration — focus lands on the whole grid instead of on the
-        // key under the finger. The framework reported exactly this: the IME window was present and
-        // correctly sized but showed `hasChildren=false`.
-        //
-        // The host must therefore stay an unlabelled container whose only job is to hand out
-        // virtual nodes; every announcement comes from a key node instead.
-        isFocusable = false
-    }
-
-    override fun getAccessibilityNodeProvider(): android.view.accessibility.AccessibilityNodeProvider =
-        accessibilityProvider
-
-    /**
-     * Hands touch-exploration hovers to the accessibility provider before the view sees them.
-     *
-     * Without this override the provider is inert for exploration: the framework finds no node to
-     * focus, the gesture reaches [onTouchEvent], and exploring a key types it. That was observed on
-     * the watch with TalkBack running before this was added.
-     */
-    override fun dispatchHoverEvent(event: MotionEvent): Boolean =
-        accessibilityProvider.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
-
-    private fun isAccessibilityActive(): Boolean {
-        val am = context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
-        return am?.isEnabled == true && am.isTouchExplorationEnabled
     }
 
     override fun onDetachedFromWindow() {

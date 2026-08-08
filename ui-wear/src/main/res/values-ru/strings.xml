@@ -5,22 +5,8 @@
     <string name="clipboard_clear_all">Очистить всё</string>
     <string name="clipboard_expires">скоро исчезнет</string>
 
-    <!-- Озвучивание для TalkBack (спец. §11.5) -->
-    <string name="a11y_space">Пробел</string>
-    <string name="a11y_backspace">Удалить</string>
-    <string name="a11y_enter">Ввод</string>
-    <string name="a11y_switch_language">Сменить язык</string>
-    <string name="a11y_clipboard">Буфер обмена</string>
-    <string name="a11y_symbols">Символы и цифры</string>
-    <string name="a11y_letters">Буквы</string>
-    <string name="a11y_more_symbols">Ещё символы</string>
-    <string name="a11y_shift">Регистр</string>
-    <string name="a11y_shift_on">Регистр включён</string>
-    <string name="a11y_caps_lock">Верхний регистр</string>
-
     <!-- Калибровка касаний (спец. §7.1). %1$d — сколько целей осталось. -->
     <string name="calibration_remaining">осталось: %1$d</string>
-    <string name="a11y_keyboard">Клавиатура</string>
     <string name="emoji_category_recent">Недавние</string>
     <string name="emoji_category_smileys">Смайлики</string>
     <string name="emoji_category_gestures">Жесты</string>
@@ -31,5 +17,4 @@
     <string name="emoji_category_travel">Путешествия</string>
     <string name="emoji_category_objects">Предметы</string>
     <string name="emoji_category_symbols">Символы</string>
-    <string name="a11y_emoji_key">Эмодзи</string>
 </resources>
