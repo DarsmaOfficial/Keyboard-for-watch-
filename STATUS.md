@@ -186,7 +186,7 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
 
 ### Unproven — measurement, not code
 
-1. **Cold IME show < 150 ms (§14).** Never measured.
+1. **Cold IME show < 150 ms (§14).** Measured: resident pass; literal true-cold fails (details below).
 3. **Context matrix (§14).** Browser URL plus real plain, multiline, password, signed/decimal
    number, and search-action `EditText` contexts now pass on the physical watch. The host field and
    composition strip stayed visible together; password mirrored bullets only; number switched to
@@ -313,6 +313,10 @@ cold-process appearance does not. The status remains FAIL under the stricter int
 
 ### Built this session, awaiting device verification
 
+**Device verification is paused at the user's instruction.** The following entries remain built/
+CI-validated only until the user explicitly reopens physical-watch testing; no device result is
+inferred from that status.
+
 - **Glide typing (§7.3), `:engine-swipe`** — resampling, banded DTW, frequency-ranked candidates,
   trace capture, trail rendering and commit. 9 unit tests. The gestures in those tests are
   synthetic; whether *real* swipes rank correctly is a device question and is not claimed here.
@@ -331,8 +335,8 @@ cold-process appearance does not. The status remains FAIL under the stricter int
 - **Themes (§11 v0.3)** — Midnight / High contrast / Amber, all AMOLED-black by test. Contrast
   verified with WCAG relative luminance rather than by eye; high contrast uses outlines, not white
   fills, because a large static bright region is what §8 warns against.
-- **Spatial prediction resolver (§7.2b)** — engine and 8 tests only; see the note above on why the
-  mode is not wired up.
+- **Spatial prediction (§7.2b)** — opt-in UI wiring plus resolver/controller tests now exist.
+  Real-finger candidate quality, rendering, and speed/error benefit remain device verification.
 - **Reproducible offline build (§3.1)** — ✅ **verified by tampering, not assumed.** Version
   catalogue (`gradle/libs.versions.toml`), six lockfiles pinning 96 coordinates including
   transitives, and the Gradle distribution SHA-256 — which was genuinely missing until now, so the
@@ -345,14 +349,6 @@ cold-process appearance does not. The status remains FAIL under the stricter int
   fingerprint pinned in the workflow and confirmed matching, published checksum verified against an
   independently downloaded copy, and all §3 gates re-checked on the *published* artifact rather
   than a local build. Keystore lives outside the repo tree; see `RELEASING.md`.
-
-### Not started — code
-
-1. **Spatial prediction UI mode (§7.2b).** The resolver is built and tested, and the real-hardware
-   calibration precondition is now satisfied. Wiring and physical evaluation are next.
-*(Release signing and the offline/reproducible build are both done — see the verified list below.)* No release keystore yet, and the
-   "builds offline from a clean machine" claim needs dependency locking and checksums to be a fact
-   rather than an aspiration.
 
 ---
 

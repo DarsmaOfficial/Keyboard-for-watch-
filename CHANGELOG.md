@@ -7,6 +7,8 @@ is reached.
 ## [Unreleased]
 
 ### Fixed
+- Tutorial controls now remain reachable on a 466×466 round display when translated text exceeds one screen height.
+- Rejected touch-calibration fits can no longer be retained as pending values and later applied.
 - **Keys no longer move under your finger.** The candidate row was removed from the layout when it
   had nothing to offer, so the moment a suggestion appeared mid-word every key row shifted down by
   its height and the next tap landed on the wrong thing — typing "helo" reliably produced "del".
@@ -33,9 +35,9 @@ is reached.
   better than the larger one it replaces.
 - The candidate row offers four words instead of three. "helo" has six neighbours at edit
   distance 1, and at three chips the intended word fell just off the end.
-- CI now fails if a word list exceeds 10 000 entries, loses its frequency column, has a stale
-  compiled index, or packages an index compressed rather than stored. The heap overrun and the
-  ranking defect were both invisible to every existing gate.
+- CI now runs `:ui-wear` unit tests and fails if a word list exceeds 10 000 entries, loses its
+  frequency column, has a stale compiled index, or packages an index compressed rather than stored.
+  The heap overrun and the ranking defect were both invisible to every existing gate.
 
 ### Removed
 - **SymSpellKt.** Used up to v0.3.0 and removed on measurement, not on preference — see above. The
@@ -47,6 +49,7 @@ is reached.
   APK and removes a redundant second copy of the same data.
 
 ### Added
+- Opt-in spatial word prediction: calibrated per-key tap probabilities are held only until Space, Enter, or an explicit candidate selection resolves the word.
 - Clipboard history (spec §6): panel replacing the key grid, one-tap paste, pin/unpin, delete,
   clear-all. Entries that look like one-time codes or card numbers are flagged and expire after
   two minutes unless pinned. The system clipboard is read only while the keyboard holds focus,
