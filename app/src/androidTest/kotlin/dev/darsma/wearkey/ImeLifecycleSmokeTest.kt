@@ -93,7 +93,7 @@ class ImeLifecycleSmokeTest {
         service.onCreateInputView()
 
         service.onStartInputView(editorInfo(), false)
-        service.typeForTest("hello")
+        service.seedEditorForTest("hello")
         assertEquals("hello", service.editorTextForTest())
 
         // A different field opens — §11.5 requires a full reset, not a carry-over.
@@ -113,7 +113,7 @@ class ImeLifecycleSmokeTest {
             EditorInfo.TYPE_CLASS_TEXT or EditorInfo.TYPE_TEXT_VARIATION_PASSWORD
         )
         service.onStartInputView(password, false)
-        service.typeForTest("secret")
+        service.seedEditorForTest("secret")
 
         val shown = service.editorTextForTest()
         assertFalse("masked field must not expose plaintext", shown.contains("secret"))
@@ -126,7 +126,7 @@ class ImeLifecycleSmokeTest {
         service.onCreate()
         service.onCreateInputView()
         service.onStartInputView(editorInfo(), false)
-        service.typeForTest("abc")
+        service.seedEditorForTest("abc")
 
         // Wear devices do not rotate, but a configuration change still arrives on font-scale and
         // locale changes, and the framework path is the same one rotation would take.
@@ -149,7 +149,7 @@ class ImeLifecycleSmokeTest {
         repeat(3) {
             service.onCreateInputView()
             service.onStartInputView(editorInfo(), false)
-            service.typeForTest("x")
+            service.seedEditorForTest("x")
             service.onFinishInput()
         }
 
