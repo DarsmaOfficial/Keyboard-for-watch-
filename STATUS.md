@@ -3,7 +3,7 @@
 Snapshot of what is built, what is verified on hardware, and what remains. Written against the
 master prompt (spec §-numbers below refer to it).
 
-**Commit:** `2724801` · **Repository:** [DarsmaOfficial/Keyboard-for-watch-](https://github.com/DarsmaOfficial/Keyboard-for-watch-)
+**Commit:** `74768a2` · **Repository:** [DarsmaOfficial/Keyboard-for-watch-](https://github.com/DarsmaOfficial/Keyboard-for-watch-)
 · **Device:** OnePlus Watch 2 `OPWWE231`, Wear OS 4 / API 34, 466 × 466
 
 A deliberate distinction runs through this document:
@@ -22,13 +22,13 @@ never measured is not a gate that passed.
 | Gate | Threshold | Measured | Status |
 |---|---|---|---|
 | Java heap, 1 resident dictionary | < 8 MB | **2.46 – 2.92 MB** | ✅ verified |
-| APK size | ≤ 15 MB | **6.10 MB** | ✅ verified |
+| APK size | ≤ 15 MB | **3.0 MB optimized release benchmark** | ✅ verified |
 | No arm64 libraries | 0 | **0** | ✅ verified |
 | No `androidx.compose.*` in keyboard path | 0 | **0** | ✅ CI-enforced |
 | Permissions declared | 0 | **0** — not even `INTERNET` | ✅ verified |
 | Composed text always visible | 100% of fields | verified in browser URL bar | ⚠️ partial — full context matrix pending |
 | Frame time, 95th percentile | ≥ 95% under 16.6 ms | **p95 = 2.51 ms, 0.39% over budget** (259 frames) | ✅ verified |
-| Cold IME show | < 150 ms | **~890 ms** (debug build, n=3) | ❌ **FAIL — 6× over** |
+| Cold IME show | < 150 ms | warm median **55.5 ms**; true-cold optimized median **372.2 ms** (n=5 each) | ❌ **literal cold gate fails; resident show passes** |
 | Text entry rate | ≥ 15 WPM | never measured | ❌ **not measured** |
 | Battery vs Gboard | no regression | never measured | ❌ **not measured** |
 
@@ -250,33 +250,59 @@ keyboard to appear begins recording, and percentiles are snapshotted when the ke
   never at risk. Four tests pin the invariant so a future change cannot silently invalidate the
   argument.
 
-### Cold IME show — measured, and it FAILS the §14 gate
+### Cold IME show — correct first-frame measurement
 
-Three clean samples on the watch: **890, 882 and 959 ms** against a **150 ms** budget — roughly
-6× over. This is a *debug* build (logcat shows `Late-enabling -Xcheck:jni`), so a release build
-with R8 will be faster, but nothing suggests it closes a 6× gap on its own. Treat this as a real
-failure to investigate, not a measurement artefact.
+The earlier result (**882, 890, 959 ms**) used `ActivityManager: Start proc` →
+`InsetsController: show(ime(), fromIme=true)`. Perfetto proved that endpoint is a framework show
+request, not the first displayed keyboard frame, so those numbers are retained only as historical
+debug-build diagnostics, not as the final §14 measurement.
 
-**Getting a trustworthy number took four attempts, and three earlier ones were wrong:**
+The reproducible measurement now follows Android's TTID principle and the spec's systrace direction:
 
-1. `am force-stop` makes the framework treat the IME as uninstalled and **silently fall back to
-   Gboard**. `dumpsys input_method` still says `mInputShown=true`, so a naive script measures the
-   system keyboard and reports a plausible number. The script now verifies our own pid appears and
-   discards the sample otherwise — it correctly refused 15 times in a row before this was fixed.
-2. `am kill` does nothing to the active IME: the framework holds it as a persistent process, the
-   pid is unchanged, and the next show is warm.
-3. **A `sleep` inside the measured interval destroys the measurement.** Opening the browser, then
-   sleeping 4 s, then tapping reported ~2400 ms — that number described the sleep. The field must
-   already be on screen so the tap triggers process start and show back to back.
+- start: the browser's tap-up event delivered to Cromite;
+- end: SurfaceFlinger's first buffer for the newly created IME layer
+  (`setBuffer/latchBuffer InputMethod#…`, frame 1);
+- cold preparation: reinstall the identical APK, verify the selected IME is unchanged and verify no
+  WearKey PID exists before the tap;
+- validity checks: correct foreground app, selected IME, process state, package bind,
+  `IMS.showWindow`, first `draw-VRI[InputMethod]`, and first SurfaceFlinger buffer must all exist;
+- statistic: all five samples plus min/median/max. The original spec defines neither markers nor a
+  percentile, and `adb shell am start` cannot directly launch an `InputMethodService`, so both
+  process-resident and true-cold results are reported rather than silently choosing one.
 
-What works: reinstall the APK (restarts the process, keeps the IME selected), with the browser and
-field already visible. Markers are framework lines — `ActivityManager: Start proc <pid>` to
-`InsetsController: show(ime(), fromIme=true)` — because §11.5 forbids logging in keyboard sources
-and CI enforces that, so no app-side instrumentation is possible.
+**Optimized non-debug R8 build (`verify` compilation state):**
 
-Script: `measure-coldshow.sh`. **Next step is to find where the ~880 ms goes** — likely candidates
-are dictionary mmap, layout JSON parsing, and first-draw of the key grid, none of which have been
-attributed yet.
+| State | Samples (ms) | Median | §14 |
+|---|---|---:|---|
+| Process resident, keyboard hidden | 49.641, 54.473, 55.466, 64.006, 70.232 | **55.466 ms** | PASS |
+| True cold process | 331.781, 358.889, 372.212, 384.450, 539.404 | **372.212 ms** | **FAIL** |
+
+For comparison, the debug build's five true-cold samples were 867.143–1020.346 ms, median
+**921.129 ms**. Enabling R8 and resource shrinking therefore cut median true-cold latency by about
+60% and reduced the APK from 5.7 MB to 3.0 MB. The production change is commit `911ad02`; the full
+CI suite passed.
+
+Perfetto attribution on the optimized median trace:
+
+- package bind request begins at +5.489 ms;
+- first app traversal at +201.363 ms;
+- `IMS.showWindow` at +222.567 ms, duration 42.787 ms;
+- layout asset opens are only ~0.13 ms each;
+- initial traversal 93.709 ms; first draw 50.914 ms;
+- first IME buffer reaches SurfaceFlinger at +372.212 ms.
+
+This rules out the earlier guesses that dictionary mmap or JSON file I/O explain the miss. Most
+remaining wall time is 32-bit `verify`-mode process/ART/class startup plus first traversal/draw.
+The OEM ignored a requested `speed` compile and remained `verify`. Baseline/ProfileInstaller work
+was considered but not added: ordinary copied-APK sideloading does not guarantee profile
+application, a `.dm` requires a special installer flow, and neither path has been verified on this
+watch.
+
+A measured lazy clipboard/emoji-panel experiment also failed to improve startup (median 408.148 ms
+versus an interleaved unchanged-baseline recheck of 368.394 ms) and was reverted in `74768a2`.
+
+**Honest verdict:** normal process-resident IME appearance comfortably meets 150 ms; literal
+cold-process appearance does not. The status remains FAIL under the stricter interpretation.
 
 ### Built this session, awaiting device verification
 
