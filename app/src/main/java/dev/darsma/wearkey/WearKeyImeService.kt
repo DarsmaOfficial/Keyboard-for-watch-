@@ -36,6 +36,8 @@ class WearKeyImeService : InputMethodService() {
 
     private val spellEngine = SpellEngine()
     private val swipeController = SwipeController(spellEngine)
+    private val spatialController = SpatialTypingController(spellEngine)
+    private var spatialTypingEnabled = false
     private val emojiRecentsStore by lazy { EmojiRecentsStore(this) }
     private val dictionaryLoader by lazy { DictionaryLoader(this, spellEngine) }
 
@@ -196,6 +198,9 @@ class WearKeyImeService : InputMethodService() {
         val view = KeyboardSurfaceView(this)
         view.bind(editorState)
         view.keyGrid.onKeyListener = KeyGridView.OnKeyListener { action -> handleKey(action) }
+        view.keyGrid.onSpatialTapListener = KeyGridView.OnSpatialTapListener { displayed, distribution ->
+            handleSpatialTap(displayed, distribution)
+        }
         view.keyGrid.swipeListener = KeyGridView.OnSwipeListener { xs, ys, count ->
             handleSwipe(xs, ys, count)
         }
@@ -231,7 +236,19 @@ class WearKeyImeService : InputMethodService() {
         }
 
         view.suggestionStrip.onSuggestionListener =
-            SuggestionStripView.OnSuggestionListener { word -> replaceCurrentWord(word) }
+            SuggestionStripView.OnSuggestionListener { word ->
+                if (spatialController.isComposing) {
+                    val ic = currentInputConnection ?: return@OnSuggestionListener
+                    editorState.setComposingText(word)
+                    editorState.finishComposingText()
+                    ic.setComposingText(word, 1)
+                    ic.finishComposingText()
+                    spatialController.clear()
+                    view.suggestionStrip.clear()
+                } else {
+                    replaceCurrentWord(word)
+                }
+            }
 
         // Spec §4.1/§9: layouts are data. Each file that parses replaces the compiled-in rows for
         // its language; each that does not simply leaves them in place, so a corrupt asset can
@@ -337,6 +354,14 @@ class WearKeyImeService : InputMethodService() {
         suggestionsDisabled = masked || noLearning
         surfaceView?.suggestionStrip?.clear()
 
+        spatialTypingEnabled = settings.spatialTypingEnabled && !suggestionsDisabled && spellEngine.isReady
+        spatialController.refreshVocabulary()
+        surfaceView?.keyGrid?.onSpatialTapListener = if (spatialTypingEnabled) {
+            KeyGridView.OnSpatialTapListener { displayed, distribution ->
+                handleSpatialTap(displayed, distribution)
+            }
+        } else null
+
         // Glide templates depend on the laid-out grid, so this is the earliest safe point. The
         // controller no-ops when nothing changed, which keeps opening a field cheap.
         surfaceView?.keyGrid?.let { swipeController.refresh(it) }
@@ -382,13 +407,15 @@ class WearKeyImeService : InputMethodService() {
         surfaceView?.keyGrid?.layout = layout
         // Swap the resident dictionary to match — only one language stays loaded (spec §4.2).
         dictionaryLoader.loadFor(layout)
-        // Templates are language- and layout-specific; the next field rebuilds them.
+        // Templates and the deferred resolver are language-specific.
         swipeController.clear()
+        spatialController.refreshVocabulary()
         surfaceView?.suggestionStrip?.clear()
     }
 
     override fun onFinishInput() {
         // Spec §11.5: state must never leak into the next field.
+        spatialController.clear()
         editorState.reset()
         super.onFinishInput()
     }
@@ -452,6 +479,32 @@ class WearKeyImeService : InputMethodService() {
         editorState.commitText(text)
     }
 
+    private fun handleSpatialTap(displayed: Char, distribution: Map<Char, Float>) {
+        if (!spatialTypingEnabled || suggestionsDisabled || distribution.isEmpty()) {
+            handleKey(KeyGridView.KeyAction.Character(displayed))
+            return
+        }
+        val ic = currentInputConnection ?: return
+        val preview = spatialController.add(displayed, distribution)
+        editorState.setComposingText(preview)
+        ic.setComposingText(preview, 1)
+        surfaceView?.suggestionStrip?.setSuggestions(spatialController.candidates().drop(1))
+    }
+
+    /** Commits the deferred word, returning true when a spatial composition existed. */
+    private fun finishSpatialWord(): Boolean {
+        if (!spatialController.isComposing) return false
+        val ic = currentInputConnection ?: return false
+        val word = spatialController.resolvedWord()
+        editorState.setComposingText(word)
+        editorState.finishComposingText()
+        ic.setComposingText(word, 1)
+        ic.finishComposingText()
+        spatialController.clear()
+        surfaceView?.suggestionStrip?.clear()
+        return true
+    }
+
     private fun handleKey(action: KeyGridView.KeyAction) {
         val ic = currentInputConnection ?: return
         ic.beginBatchEdit()
@@ -463,6 +516,7 @@ class WearKeyImeService : InputMethodService() {
                     refreshSuggestions()
                 }
                 KeyGridView.KeyAction.Space -> {
+                    finishSpatialWord()
                     // Space ends the word: clear the candidate row rather than leaving stale
                     // suggestions for a word that is already finished. The correction is NOT
                     // applied automatically — on a watch, silently rewriting what someone typed
@@ -472,11 +526,27 @@ class WearKeyImeService : InputMethodService() {
                     surfaceView?.suggestionStrip?.clear()
                 }
                 KeyGridView.KeyAction.Backspace -> {
-                    editorState.backspace()
-                    ic.deleteSurroundingText(1, 0)
-                    refreshSuggestions()
+                    if (spatialController.isComposing) {
+                        val preview = spatialController.backspace()
+                        if (preview.isEmpty()) {
+                            editorState.setComposingText("")
+                            editorState.finishComposingText()
+                            ic.setComposingText("", 1)
+                            ic.finishComposingText()
+                            surfaceView?.suggestionStrip?.clear()
+                        } else {
+                            editorState.setComposingText(preview)
+                            ic.setComposingText(preview, 1)
+                            surfaceView?.suggestionStrip?.setSuggestions(spatialController.candidates().drop(1))
+                        }
+                    } else {
+                        editorState.backspace()
+                        ic.deleteSurroundingText(1, 0)
+                        refreshSuggestions()
+                    }
                 }
                 KeyGridView.KeyAction.Enter -> {
+                    finishSpatialWord()
                     // If the field asked for a specific action (Search / Send / Go / Next /
                     // Done), perform that instead of inserting a newline — otherwise a search
                     // box just gains a line break and never searches (spec §11.5).
@@ -537,6 +607,7 @@ class WearKeyImeService : InputMethodService() {
         // with the visible layout, exactly as onCurrentInputMethodSubtypeChanged does.
         dictionaryLoader.loadFor(next)
         swipeController.clear()
+        spatialController.refreshVocabulary()
         surfaceView?.suggestionStrip?.clear()
     }
 

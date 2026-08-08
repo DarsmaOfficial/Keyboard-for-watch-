@@ -57,6 +57,13 @@ class KeyGridView @JvmOverloads constructor(
 
     var onKeyListener: OnKeyListener? = null
 
+    /** Optional §7.2b tap path: character plus the full calibrated key posterior. */
+    fun interface OnSpatialTapListener {
+        fun onSpatialTap(displayed: Char, distribution: Map<Char, Float>)
+    }
+
+    var onSpatialTapListener: OnSpatialTapListener? = null
+
     /**
      * Layout enum backing the in-keyboard language key (spec §5.5: "on a watch, opening system
      * settings to change language is unusable" — so a key here is required, not optional, even
@@ -800,7 +807,20 @@ class KeyGridView @JvmOverloads constructor(
                 invalidate()
 
                 if (released != null) {
-                    handleKeyAction(released)
+                    val action = released.action
+                    val spatial = onSpatialTapListener
+                    if (spatial != null && action is KeyAction.Character && !symbolLayerVisible) {
+                        haptics.perform(HapticFeedback.Feedback.KEY_TAP)
+                        val displayed = if (shiftState == ShiftState.OFF) {
+                            action.char.lowercaseChar()
+                        } else {
+                            action.char.uppercaseChar()
+                        }
+                        spatial.onSpatialTap(displayed, characterDistribution(event.x, event.y))
+                        if (shiftState == ShiftState.SHIFTED) shiftState = ShiftState.OFF
+                    } else {
+                        handleKeyAction(released)
+                    }
                     return true
                 }
                 return false
@@ -940,6 +960,21 @@ class KeyGridView @JvmOverloads constructor(
         val model = touchModel ?: return keys.firstOrNull { it.rect.contains(x, y) }
         val match = model.bestMatch(x, y, touchTargets) ?: return null
         return keys.getOrNull(match.id)
+    }
+
+    /** Full letter posterior for deferred spatial word resolution (§7.2b). */
+    private fun characterDistribution(x: Float, y: Float): Map<Char, Float> {
+        val model = touchModel ?: return emptyMap()
+        val byId = model.distribution(x, y, touchTargets)
+        val result = LinkedHashMap<Char, Float>()
+        for ((id, probability) in byId) {
+            val action = keys.getOrNull(id)?.action
+            if (action is KeyAction.Character && action.char.isLetter()) {
+                val c = action.char.lowercaseChar()
+                result[c] = (result[c] ?: 0f) + probability
+            }
+        }
+        return result
     }
 
     /** Rebuilds the touch-model targets from the drawn key rects. Called once per layout pass. */

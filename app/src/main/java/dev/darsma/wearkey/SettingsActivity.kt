@@ -112,6 +112,24 @@ class SettingsActivity : Activity() {
             }
         )
 
+        val spatialValue = TextView(this).apply {
+            setTextColor(Color.parseColor("#9E9E9E"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        }
+        fun updateSpatialLabel() {
+            spatialValue.text = getString(
+                if (prefs.spatialTypingEnabled) R.string.settings_spatial_typing_on
+                else R.string.settings_spatial_typing_off
+            )
+        }
+        updateSpatialLabel()
+        column.addView(
+            row(getString(R.string.settings_spatial_typing), spatialValue) {
+                prefs.spatialTypingEnabled = !prefs.spatialTypingEnabled
+                updateSpatialLabel()
+            }
+        )
+
         column.addView(
             row(getString(R.string.settings_tutorial), null) {
                 startActivity(Intent(this, TutorialActivity::class.java))
