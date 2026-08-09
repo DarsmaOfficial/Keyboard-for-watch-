@@ -1,12 +1,12 @@
 name: Feature request
-description: Suggest a focused improvement consistent with WearKey's offline-first constraints
+description: Suggest an improvement to typing or setup on the watch
 title: "idea: "
 labels: [enhancement]
 body:
   - type: markdown
     attributes:
       value: |
-        WearKey cannot add cloud features, accounts, telemetry, ads, microphone input, paid services, native code, or GPL/AGPL dependencies.
+        WearKey is an offline, touch-only keyboard. Suggestions that need a server, account, microphone, paid service or GPL/AGPL code will not fit the project.
   - type: textarea
     id: problem
     attributes:
@@ -22,7 +22,7 @@ body:
   - type: textarea
     id: constraints
     attributes:
-      label: Offline/privacy impact
-      description: "Explain why this needs no network permission, account, telemetry, microphone, or paid service."
+      label: Does it need any new permission or dependency?
+      description: "List it here and explain why it is needed."
     validations:
       required: true

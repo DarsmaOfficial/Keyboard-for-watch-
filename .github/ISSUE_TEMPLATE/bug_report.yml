@@ -1,12 +1,12 @@
 name: Bug report
-description: Report a reproducible WearKey problem
+description: Tell me about something that is broken or behaves unexpectedly
 title: "bug: "
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve WearKey. Please do not include passwords, message contents, clipboard text, or any other sensitive input.
+        Please leave out passwords, messages, clipboard contents and any other private text.
   - type: input
     id: watch
     attributes:
@@ -38,12 +38,5 @@ body:
     id: actual
     attributes:
       label: Actual behaviour
-    validations:
-      required: true
-  - type: dropdown
-    id: sensitive
-    attributes:
-      label: Did your report omit sensitive text?
-      options: ["Yes", "I need to edit this report"]
     validations:
       required: true

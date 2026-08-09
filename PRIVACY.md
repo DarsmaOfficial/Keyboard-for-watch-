@@ -1,88 +1,63 @@
 # Privacy
 
-A keyboard sees everything you type. You are right to be suspicious of one. This document
-states plainly what WearKey does and does not do, in terms you can verify yourself.
+A keyboard handles private text, so this page describes what WearKey can access and what it keeps.
+The claims below are also checkable in the source and built APK.
 
-## Nothing leaves your watch
+## Network and microphone
 
-WearKey does not request `android.permission.INTERNET`. This is not a policy or a promise — an
-Android app without that permission is **incapable** of opening a network connection. Check the
-APK yourself:
+WearKey does not request `android.permission.INTERNET` or `RECORD_AUDIO`. It cannot open a network
+connection and has no voice-input path. There is no analytics SDK, crash-reporting service,
+advertising, cloud correction, sync or remote backup.
 
-```sh
-unzip -p app-release.apk AndroidManifest.xml | strings | grep -i internet   # no match
-```
-
-Consequently there is:
-
-- no telemetry or analytics
-- no crash reporting to any server
-- no cloud spell-check, translation, or AI features
-- no sync, no backup to a remote service
-- no advertising or tracking SDKs of any kind
-
-## No microphone
-
-`RECORD_AUDIO` is not requested, there is no voice-input button, and the app does not register
-for `android.speech.action.RECOGNIZE_SPEECH`. WearKey is a touch-only keyboard and will remain
-one. Verify:
+You can inspect the packaged permissions with Android build tools, for example:
 
 ```sh
-unzip -p app-release.apk AndroidManifest.xml | strings | grep -i record_audio  # no match
+aapt2 dump permissions wearkey.apk
 ```
 
-## What is stored on the device
+`android.permission.VIBRATE` is declared for key haptics. It is a normal local hardware permission
+and does not provide access to personal data.
 
-| Data | Where | Why | How to erase |
-|---|---|---|---|
-| Clipboard history (up to 25 entries) | App-private storage on the watch | So you can paste something you copied earlier | "Clear all" in the clipboard panel, or uninstall |
-| Selected keyboard layout / language | App-private preferences | To restore your choice | Uninstall |
+## Data kept on the watch
 
-App-private storage is readable only by this app and by the device owner with root. This watch
-has file-based encryption active, so it is encrypted at rest by the platform.
+| Data | Storage | Removal |
+|---|---|---|
+| Clipboard history, up to 25 entries | App-private encrypted storage | Clear it from the clipboard panel or uninstall WearKey |
+| Theme, language, haptic level and touch calibration | App-private preferences | Use the relevant reset where available, or uninstall WearKey |
+| Emoji recents | App-private storage | Use **Clear all data** in WearKey settings or uninstall WearKey |
 
-There is **no** learned-word dictionary, typing history, or usage log. Autocorrect is not
-implemented yet; when it is, words will never be learned from password, OTP or
-`IME_FLAG_NO_PERSONALIZED_LEARNING` fields.
+WearKey does not maintain a learned-word history or usage log. Its English and Russian dictionaries
+are fixed files included in the APK. Autocorrect, glide recognition and spatial prediction run
+locally against those files.
 
-## Password and OTP fields
+## Password and PIN fields
 
-When the field you are typing into is a password, visible-password, web-password or numeric-PIN
-field, WearKey never stores the characters you type — not even briefly in memory for the preview
-strip. The strip shows bullet characters, generated from a count, and the real characters go
-straight to the app you are typing into.
+For password, visible-password, web-password and numeric-PIN fields, WearKey's local editor state
+stores one bullet per character rather than the plaintext. The real character is sent directly to
+the app that owns the field.
 
-Text copied from such fields is not captured into clipboard history. Clipboard entries that look
-like one-time codes (4–8 digits) or card numbers are flagged and automatically deleted after two
-minutes unless you pin them.
+WearKey also disables suggestions and learning-related behavior for masked fields and fields marked
+`IME_FLAG_NO_PERSONALIZED_LEARNING`.
 
-## Clipboard access
+## Clipboard handling
 
-Android 10 and later only allow a keyboard to read the system clipboard while it is actually on
-screen and focused. WearKey works strictly within that boundary: it reads the clipboard when you
-open a text field, and never in the background. There is no background service, no polling loop,
-and no AccessibilityService workaround.
+Android only lets an active keyboard read the system clipboard while it has input focus. WearKey
+reads it when a field opens; it has no background polling service and no AccessibilityService.
+Clipboard entries that resemble a short one-time code or card number expire after two minutes
+unless pinned.
 
-## No logging of keystrokes
+## Logs and backups
 
-Nothing you type is written to the Android log, at any log level, in any build — including debug
-builds.
+Keyboard input is not written to Logcat in either debug or release builds. CI rejects logging calls
+in the typing source paths.
 
-## Backups
-
-`android:allowBackup="false"` is set, so the app's data is excluded from Android's
-backup/transfer mechanisms. Your clipboard history does not travel to a new device or into
-anyone's cloud.
+`android:allowBackup="false"` excludes WearKey's app data from Android backup and device-transfer
+backup mechanisms.
 
 ## Distribution
 
-WearKey is distributed as an APK file from a public GitHub repository. There is no store, no
-account, and no installer that reports back. A copied APK works exactly the same as a downloaded
-one.
+WearKey is distributed as an APK from this repository. It has no store account, installer service
+or phone companion. Copying the APK to another watch does not contact this project.
 
-## Verifying any of this
-
-The complete source is at
-<https://github.com/DarsmaOfficial/Keyboard-for-watch-> and builds reproducibly with
-`./gradlew :app:assembleDebug`. If something in this document does not match the code, that is a
-bug — please open an issue.
+If this page and the code disagree, please treat it as a bug and open an issue without including any
+private text.

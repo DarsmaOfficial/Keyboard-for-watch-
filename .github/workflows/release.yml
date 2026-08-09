@@ -143,17 +143,19 @@ jobs:
           body: |
             ## WearKey ${{ steps.version.outputs.value }}
 
-            A free, fully offline keyboard for Wear OS. No account, no tiers, no telemetry,
-            no network permission, no microphone.
+            WearKey is an offline keyboard for Wear OS. The APK has no Internet or microphone
+            permission and does not need a phone app or account.
 
-            > **Upgrading from v0.1.0?** That release was debug-signed, before the project had a
-            > release key. This build is signed properly, so Android will refuse to install it
-            > over the old one. Uninstall first — `adb uninstall dev.darsma.wearkey` — then
-            > install this APK. This is a one-time step; future updates install normally.
+            If you still have v0.1.0 installed, uninstall it first. That version used a temporary
+            debug key and Android will not install a release-signed build over it:
+
+            ```sh
+            adb uninstall dev.darsma.wearkey
+            ```
 
             ### Install
 
-            Download the APK below and side-load it:
+            Download the APK and its `.sha256` file below, then install it:
 
             ```sh
             adb connect <watch-ip>:<port>
@@ -162,15 +164,9 @@ jobs:
             adb shell ime set    dev.darsma.wearkey/.WearKeyImeService
             ```
 
-            No computer? The same two `ime` commands work through Shizuku on the watch.
+            The two `ime` commands can also be run through Shizuku on the watch.
 
-            Verify your download against the published `.sha256` file.
+            Requires Wear OS 3 or newer (API 30+). The main test device is a OnePlus Watch 2
+            running Wear OS 4.
 
-            ### Requirements
-
-            Wear OS 3 or newer (API 30+). Tested on the OnePlus Watch 2 (Wear OS 4, API 34).
-
-            ---
-
-            Licence: Apache-2.0. Source, privacy statement and third-party notices are in the
-            repository.
+            Apache-2.0. Source and privacy details are in the repository.
