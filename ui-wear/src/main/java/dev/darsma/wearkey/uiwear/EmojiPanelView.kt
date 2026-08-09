@@ -72,6 +72,15 @@ class EmojiPanelView @JvmOverloads constructor(
         color = Color.parseColor("#2A2A2A")
     }
 
+    private val closePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#00E5FF")
+        textAlign = Paint.Align.CENTER
+    }
+
+    private val closeBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#10272C")
+    }
+
     private val scroller = OverScroller(context)
     private var scrollY = 0f
     private var maxScroll = 0f
@@ -79,6 +88,7 @@ class EmojiPanelView @JvmOverloads constructor(
     private var pressedColumn = -1
     private var downY = 0f
     private var dragging = false
+    private var closePressed = false
 
     private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
 
@@ -108,6 +118,7 @@ class EmojiPanelView @JvmOverloads constructor(
         emojiPaint.textSize = cellSize * 0.62f
         headerHeight = cellSize * 0.5f
         headerPaint.textSize = headerHeight * 0.52f
+        closePaint.textSize = cellSize * 0.34f
         rebuild()
     }
 
@@ -126,7 +137,7 @@ class EmojiPanelView @JvmOverloads constructor(
         val contentHeight = rows.sumOf { row ->
             if (row.firstOrNull() is Cell.Header) headerHeight.toDouble() else cellSize.toDouble()
         }.toFloat()
-        maxScroll = (contentHeight - height).coerceAtLeast(0f)
+        maxScroll = (contentHeight - (height - closeBarHeight())).coerceAtLeast(0f)
         scrollY = scrollY.coerceIn(0f, maxScroll)
         invalidate()
     }
@@ -208,6 +219,22 @@ class EmojiPanelView @JvmOverloads constructor(
             }
             y += rowHeight
         }
+
+        // Fixed above the scrolling catalogue, so there is always an obvious route back even after
+        // scrolling hundreds of glyphs. The emoji key itself is hidden while this panel is open.
+        val barTop = height - closeBarHeight()
+        closeBackgroundPaint.color = Color.parseColor(if (closePressed) "#1A3A41" else "#10272C")
+        canvas.drawRoundRect(
+            cellSize * 0.7f, barTop + 3f,
+            width - cellSize * 0.7f, height - 3f,
+            16f, 16f, closeBackgroundPaint
+        )
+        canvas.drawText(
+            context.getString(R.string.emoji_back_to_keyboard),
+            width / 2f,
+            barTop + closeBarHeight() * 0.67f,
+            closePaint
+        )
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -216,12 +243,23 @@ class EmojiPanelView @JvmOverloads constructor(
                 scroller.forceFinished(true)
                 downY = event.y
                 dragging = false
-                locate(event.x, event.y)
+                closePressed = event.y >= height - closeBarHeight()
+                if (closePressed) {
+                    pressedRow = -1
+                    pressedColumn = -1
+                } else {
+                    locate(event.x, event.y)
+                }
                 invalidate()
                 return true
             }
 
             MotionEvent.ACTION_MOVE -> {
+                if (closePressed) {
+                    closePressed = event.y >= height - closeBarHeight()
+                    invalidate()
+                    return true
+                }
                 val dy = downY - event.y
                 if (!dragging && kotlin.math.abs(dy) > touchSlop) {
                     dragging = true
@@ -239,7 +277,12 @@ class EmojiPanelView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_UP -> {
-                if (!dragging) commitPressed()
+                if (closePressed && event.y >= height - closeBarHeight()) {
+                    onCloseListener?.onClose()
+                } else if (!dragging) {
+                    commitPressed()
+                }
+                closePressed = false
                 pressedRow = -1
                 pressedColumn = -1
                 dragging = false
@@ -248,6 +291,7 @@ class EmojiPanelView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                closePressed = false
                 pressedRow = -1
                 pressedColumn = -1
                 dragging = false
@@ -260,6 +304,7 @@ class EmojiPanelView @JvmOverloads constructor(
 
     private fun locate(x: Float, y: Float) {
         pressedRow = -1
+        if (y >= height - closeBarHeight()) return
         pressedColumn = -1
         var top = -scrollY
         for ((rowIndex, row) in rows.withIndex()) {
@@ -277,6 +322,8 @@ class EmojiPanelView @JvmOverloads constructor(
             top += rowHeight
         }
     }
+
+    private fun closeBarHeight(): Float = (cellSize * 0.72f).coerceAtLeast(44f)
 
     private fun commitPressed() {
         val row = rows.getOrNull(pressedRow) ?: return

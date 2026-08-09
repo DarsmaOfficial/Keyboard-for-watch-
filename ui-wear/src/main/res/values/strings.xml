@@ -7,6 +7,7 @@
 
     <!-- Touch calibration (spec §7.1). %1$d is how many targets are left to tap. -->
     <string name="calibration_remaining">%1$d left</string>
+    <string name="emoji_back_to_keyboard">‹ ABC</string>
     <string name="emoji_category_recent">Recent</string>
     <string name="emoji_category_smileys">Smileys</string>
     <string name="emoji_category_gestures">Gestures</string>

@@ -7,6 +7,7 @@ import android.os.Bundle
 import dev.darsma.wearkey.imecore.ClipboardStore
 import dev.darsma.wearkey.imecore.EditorState
 import dev.darsma.wearkey.uiwear.ClipboardPanelView
+import dev.darsma.wearkey.uiwear.EmojiPanelView
 import dev.darsma.wearkey.uiwear.KeyGridView
 import dev.darsma.wearkey.uiwear.KeyboardSurfaceView
 
@@ -59,6 +60,12 @@ class LaunchKeyboardActivity : Activity() {
                 view.hideClipboard()
             }
         }
+        view.emojiPanel.onEmojiListener = EmojiPanelView.OnEmojiListener { emoji ->
+            editorState.commitText(emoji)
+        }
+        view.emojiPanel.onCloseListener = EmojiPanelView.OnCloseListener {
+            view.hideEmoji()
+        }
         surfaceView = view
         setContentView(view)
 
@@ -77,6 +84,15 @@ class LaunchKeyboardActivity : Activity() {
                     editorState.commitText(existing.toString())
                 }
             }
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        when {
+            surfaceView?.isEmojiOpen == true -> surfaceView?.hideEmoji()
+            surfaceView?.isClipboardOpen == true -> surfaceView?.hideClipboard()
+            else -> super.onBackPressed()
         }
     }
 

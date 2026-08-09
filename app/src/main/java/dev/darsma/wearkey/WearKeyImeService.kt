@@ -234,6 +234,9 @@ class WearKeyImeService : InputMethodService() {
         view.emojiPanel.onEmojiListener = EmojiPanelView.OnEmojiListener { emoji ->
             commitEmoji(emoji)
         }
+        view.emojiPanel.onCloseListener = EmojiPanelView.OnCloseListener {
+            view.hideEmoji()
+        }
 
         view.suggestionStrip.onSuggestionListener =
             SuggestionStripView.OnSuggestionListener { word ->
@@ -439,9 +442,15 @@ class WearKeyImeService : InputMethodService() {
      * what the user means.
      */
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
-        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && surfaceView?.isClipboardOpen == true) {
-            surfaceView?.hideClipboard()
-            return true
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+            if (surfaceView?.isEmojiOpen == true) {
+                surfaceView?.hideEmoji()
+                return true
+            }
+            if (surfaceView?.isClipboardOpen == true) {
+                surfaceView?.hideClipboard()
+                return true
+            }
         }
         return super.onKeyDown(keyCode, event)
     }

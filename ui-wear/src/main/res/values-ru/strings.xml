@@ -7,6 +7,7 @@
 
     <!-- Калибровка касаний (спец. §7.1). %1$d — сколько целей осталось. -->
     <string name="calibration_remaining">осталось: %1$d</string>
+    <string name="emoji_back_to_keyboard">‹ АБВ</string>
     <string name="emoji_category_recent">Недавние</string>
     <string name="emoji_category_smileys">Смайлики</string>
     <string name="emoji_category_gestures">Жесты</string>

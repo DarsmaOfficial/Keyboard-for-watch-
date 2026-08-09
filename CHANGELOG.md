@@ -7,6 +7,7 @@ is reached.
 ## [Unreleased]
 
 ### Fixed
+- Emoji mode now has a fixed `‹ ABC` / `‹ АБВ` return control; system Back also returns to the key grid instead of dismissing or trapping the keyboard.
 - Tutorial controls now remain reachable on a 466×466 round display when translated text exceeds one screen height.
 - Rejected touch-calibration fits can no longer be retained as pending values and later applied.
 - **Keys no longer move under your finger.** The candidate row was removed from the layout when it
