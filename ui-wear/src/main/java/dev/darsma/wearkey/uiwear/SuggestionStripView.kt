@@ -51,6 +51,14 @@ class SuggestionStripView @JvmOverloads constructor(
         textPaint.textSize = 13f * density
     }
 
+    fun applyTheme(theme: KeyboardTheme) {
+        bgPaint.color = theme.background
+        chipPaint.color = theme.letterKey
+        chipPressedPaint.color = theme.pressedKey
+        textPaint.color = theme.label
+        invalidate()
+    }
+
     /** Replaces the offered candidates. Passing an empty list hides the strip entirely. */
     /**
      * Replaces the offered candidates.

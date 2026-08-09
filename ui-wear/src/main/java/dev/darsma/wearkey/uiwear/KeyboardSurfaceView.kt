@@ -35,6 +35,18 @@ class KeyboardSurfaceView @JvmOverloads constructor(
     val clipboardPanel: ClipboardPanelView
     val emojiPanel: EmojiPanelView
 
+    var theme: KeyboardTheme = KeyboardTheme.MIDNIGHT
+        set(value) {
+            if (field == value) return
+            field = value
+            setBackgroundColor(value.background)
+            compositionStrip.applyTheme(value)
+            suggestionStrip.applyTheme(value)
+            keyGrid.theme = value
+            clipboardPanel.applyTheme(value)
+            emojiPanel.applyTheme(value)
+        }
+
     init {
         setBackgroundColor(Color.BLACK)
 
@@ -92,6 +104,12 @@ class KeyboardSurfaceView @JvmOverloads constructor(
             visibility = GONE
         }
         interactionSlot.addView(emojiPanel)
+
+        // Apply once after all children exist; subsequent assignments propagate live.
+        compositionStrip.applyTheme(theme)
+        suggestionStrip.applyTheme(theme)
+        clipboardPanel.applyTheme(theme)
+        emojiPanel.applyTheme(theme)
     }
 
     /** Wires both sub-views to the given state in one call — keeps entry points' code trivial. */

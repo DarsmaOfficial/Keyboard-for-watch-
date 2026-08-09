@@ -93,6 +93,19 @@ class ClipboardPanelView @JvmOverloads constructor(
         backPaint.textSize = 14f * density
     }
 
+    fun applyTheme(theme: KeyboardTheme) {
+        bgPaint.color = theme.background
+        rowPaint.color = theme.letterKey
+        rowPressedPaint.color = theme.pressedKey
+        textPaint.color = theme.label
+        hintPaint.color = theme.label
+        backPaint.color = theme.accent
+        pinPaint.color = theme.accent
+        pinOffPaint.color = theme.functionKey
+        deletePaint.color = theme.label
+        invalidate()
+    }
+
     fun bind(store: ClipboardStore) {
         this.store = store
         refresh()

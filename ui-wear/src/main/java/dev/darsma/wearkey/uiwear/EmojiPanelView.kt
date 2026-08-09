@@ -81,6 +81,8 @@ class EmojiPanelView @JvmOverloads constructor(
         color = Color.parseColor("#10272C")
     }
 
+    private var theme: KeyboardTheme = KeyboardTheme.MIDNIGHT
+
     private val scroller = OverScroller(context)
     private var scrollY = 0f
     private var maxScroll = 0f
@@ -99,6 +101,16 @@ class EmojiPanelView @JvmOverloads constructor(
     init {
         setBackgroundColor(Color.BLACK)
         isClickable = true
+    }
+
+    fun applyTheme(value: KeyboardTheme) {
+        theme = value
+        backgroundPaint.color = value.background
+        emojiPaint.color = value.label
+        headerPaint.color = value.label
+        pressedPaint.color = value.pressedKey
+        closePaint.color = value.accent
+        invalidate()
     }
 
     /** Seeds recents from persisted storage. */
@@ -223,7 +235,7 @@ class EmojiPanelView @JvmOverloads constructor(
         // Fixed above the scrolling catalogue, so there is always an obvious route back even after
         // scrolling hundreds of glyphs. The emoji key itself is hidden while this panel is open.
         val barTop = height - closeBarHeight()
-        closeBackgroundPaint.color = Color.parseColor(if (closePressed) "#1A3A41" else "#10272C")
+        closeBackgroundPaint.color = if (closePressed) theme.pressedKey else theme.functionKey
         canvas.drawRoundRect(
             cellSize * 0.7f, barTop + 3f,
             width - cellSize * 0.7f, height - 3f,

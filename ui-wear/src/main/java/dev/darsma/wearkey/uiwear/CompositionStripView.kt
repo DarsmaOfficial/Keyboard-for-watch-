@@ -79,6 +79,14 @@ class CompositionStripView @JvmOverloads constructor(
         textPaint.textSize = 16f * density
     }
 
+    fun applyTheme(theme: KeyboardTheme) {
+        backgroundPaint.color = theme.background
+        textPaint.color = theme.label
+        caretPaint.color = theme.accent
+        underlinePaint.color = theme.functionKey
+        invalidate()
+    }
+
     fun bind(state: EditorState) {
         editorState?.removeListener(this)
         editorState = state

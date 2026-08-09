@@ -66,6 +66,7 @@ class WearKeyImeService : InputMethodService() {
         // Drop the static view reference before the service goes away, so a torn-down keyboard
         // cannot be retained by the frame-stats screen.
         liveKeyGrid = null
+        liveSurface = null
         super.onDestroy()
     }
 
@@ -264,7 +265,7 @@ class WearKeyImeService : InputMethodService() {
         surfaceView = view
         // Registers the grid and starts recording if measurement was requested from Settings,
         // where no keyboard existed yet to receive the request.
-        onKeyGridShown(view.keyGrid)
+        onKeyGridShown(view)
         return view
     }
 
@@ -371,7 +372,7 @@ class WearKeyImeService : InputMethodService() {
 
         // Re-read on every field so a theme change in Settings takes effect at the next keyboard
         // show, without needing the IME to be restarted.
-        surfaceView?.keyGrid?.theme = KeyboardTheme.byId(SettingsStore(this).themeId)
+        surfaceView?.theme = KeyboardTheme.byId(SettingsStore(this).themeId)
 
         // Clipboard reads are only legal while the IME holds focus (spec §6) — do it here.
         captureSystemClipboard(info)
@@ -688,6 +689,8 @@ class WearKeyImeService : InputMethodService() {
          */
         @Volatile
         private var liveKeyGrid: KeyGridView? = null
+        @Volatile
+        private var liveSurface: KeyboardSurfaceView? = null
 
         /**
          * Set when measurement has been requested but no keyboard was showing to receive it.
@@ -728,7 +731,7 @@ class WearKeyImeService : InputMethodService() {
          */
         /** Applies settings immediately when the Settings activity changes them. */
         fun refreshVisualSettings(theme: KeyboardTheme, hapticIntensity: Float) {
-            liveKeyGrid?.theme = theme
+            liveSurface?.theme = theme
             liveKeyGrid?.haptics?.intensity = hapticIntensity
         }
 
@@ -736,9 +739,10 @@ class WearKeyImeService : InputMethodService() {
             liveKeyGrid?.frameStats() ?: lastFrameStats
 
         /** Called by the service as the keyboard view appears, to honour a pending request. */
-        internal fun onKeyGridShown(grid: KeyGridView) {
-            liveKeyGrid = grid
-            if (frameTimingRequested) grid.startFrameTiming()
+        internal fun onKeyGridShown(surface: KeyboardSurfaceView) {
+            liveSurface = surface
+            liveKeyGrid = surface.keyGrid
+            if (frameTimingRequested) surface.keyGrid.startFrameTiming()
         }
 
         /** Called as the keyboard goes away, preserving whatever it measured. */

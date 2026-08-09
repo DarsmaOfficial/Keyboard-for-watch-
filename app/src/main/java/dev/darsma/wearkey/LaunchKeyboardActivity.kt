@@ -35,7 +35,7 @@ class LaunchKeyboardActivity : Activity() {
         val view = KeyboardSurfaceView(this)
         view.bind(editorState)
         val settings = SettingsStore(this)
-        view.keyGrid.theme = KeyboardTheme.byId(settings.themeId)
+        view.theme = KeyboardTheme.byId(settings.themeId)
         view.keyGrid.haptics.intensity = settings.hapticIntensity
         view.keyGrid.onKeyListener = KeyGridView.OnKeyListener { action -> handleKey(action) }
         view.clipboardPanel.bind(clipboardStore)
