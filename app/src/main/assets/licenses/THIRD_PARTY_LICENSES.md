@@ -13,7 +13,7 @@ The project's own licence is Apache-2.0 — see [`LICENSE`](LICENSE) and [`NOTIC
 | Component | Version | Licence | Upstream |
 |---|---|---|---|
 | Kotlin standard library (`kotlin-stdlib`) | 2.1.0 | Apache-2.0 | https://github.com/JetBrains/kotlin |
-| `androidx.dynamicanimation` | 1.0.0 | Apache-2.0 | https://developer.android.com/jetpack/androidx |
+| `androidx.dynamicanimation` | 1.1.0 | Apache-2.0 | https://developer.android.com/jetpack/androidx |
 | English word list (SCOWL, via `wooorm/dictionaries`) | 2020.12.07 | BSD-style | https://github.com/wooorm/dictionaries |
 | Russian word list (Lebedev, via `wooorm/dictionaries`) | 2020 | BSD | https://github.com/wooorm/dictionaries |
 | Word frequency counts (Wortschatz Leipzig Corpora Collection) | eng_news_2020, rus_news_2022 | CC BY 4.0 | https://wortschatz.uni-leipzig.de/en/download |

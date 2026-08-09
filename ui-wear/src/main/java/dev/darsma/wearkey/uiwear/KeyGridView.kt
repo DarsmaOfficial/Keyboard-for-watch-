@@ -260,22 +260,8 @@ class KeyGridView @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Honours the system's animator duration scale (spec §8.0 reduced-motion requirement).
-     * When the user has turned animations off, scale 0 means we skip the spring entirely and
-     * jump straight to the target.
-     */
-    private val animationsEnabled: Boolean
-        get() = runCatching {
-            android.provider.Settings.Global.getFloat(
-                context.contentResolver,
-                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-                1f
-            ) > 0f
-        }.getOrDefault(true)
-
     private fun animatePressTo(target: Float) {
-        if (!animationsEnabled) {
+        if (!MotionPolicy.essentialAnimationEnabled()) {
             pressScale = target
             invalidate()
             return

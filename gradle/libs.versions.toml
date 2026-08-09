@@ -11,7 +11,7 @@
 
 [versions]
 # 1.0.0 is the only stable release; it has had no API changes since 2020.
-dynamicanimation = "1.0.0"
+dynamicanimation = "1.1.0"
 # androidx.test — instrumented smoke test only (§9). Never enters the shipped APK: these are
 # androidTest-scoped, so they are absent from releaseRuntimeClasspath.
 testExtJunit = "1.2.1"

@@ -103,5 +103,5 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
 
     // Intentionally minimal for Phase 0: no Compose, no NDK, no INTERNET-requiring libs.
-    // androidx.dynamicanimation is added in Phase 3 (motion) — not needed to draw a static grid.
+    // Motion runtime arrives transitively from :ui-wear; no Compose or native payload.
 }

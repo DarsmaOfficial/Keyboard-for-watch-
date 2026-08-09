@@ -29,7 +29,7 @@ dependencies {
     // explicitly NOT androidx.compose — the CI gate still passes.
     implementation(libs.androidx.dynamicanimation)
     // Phase 0/1/2: plain View + Canvas only.
-    // androidx.dynamicanimation (spring physics, 31 KB) is added in Phase 3 — not yet.
+    // Small Apache-2.0 spring runtime; no Compose or native payload.
     // HARD RULE (spec §8.0): this module must never depend on androidx.compose.* —
     // verify with `./gradlew :ui-wear:dependencies` before every release.
 }

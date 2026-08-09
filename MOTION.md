@@ -23,9 +23,9 @@ candidate row collapse when empty, which shifted every key row down by 26 dp mid
 "helo" reliably produced "del" because the next tap landed on a chip. Layout stability outranks
 every visual effect in this document.
 
-**4. Zero cost when idle.** No animator runs while the keyboard is hidden, and no animation loops.
-Every spring settles and stops. Spec §11.5 requires idle battery cost to be zero, and an IME is
-resident whenever the user types.
+**4. No hidden animation work.** Springs and panel transitions settle and stop, and every callback
+is removed when its view detaches. The visible composition caret deliberately toggles every 500 ms;
+there is no animator or callback activity after the keyboard is hidden.
 
 ## What animates
 
@@ -65,6 +65,19 @@ press does not scale with keyboard size.
 here?" ambiguous at exactly the moment the user is checking. The 500 ms period matches the
 platform text-cursor convention, so it looks native rather than novel.
 
+### Clipboard / emoji panel — fixed-slot reveal
+
+| Property | Value |
+|---|---|
+| Animated property | destination alpha only |
+| Duration | 90 ms |
+| Geometry | unchanged; all surfaces share one fixed `FrameLayout` slot |
+| Input ownership | destination only, immediately |
+| Disabled when | system animation is off or power saver is active |
+
+The source surface is hidden before the destination fades in, so invisible content cannot retain
+touch input. The transition never moves or resizes keys.
+
 ### Composition strip — horizontal auto-scroll
 
 The strip scrolls to keep the caret visible as text exceeds its width. This tracks caret position
@@ -83,11 +96,10 @@ directly rather than animating toward it: during fast typing an eased scroll lan
 
 ## Reduced motion
 
-`Settings.Global.ANIMATOR_DURATION_SCALE` is read before starting any spring. When the system
-reports `0`, the spring is skipped entirely and `pressScale` jumps straight to its target — the
-key still visibly changes state, it simply does not travel. This is a genuine accessibility
-requirement (motion sensitivity, vestibular disorders), not a performance toggle, so it is honoured
-even though the animation is cheap.
+`ValueAnimator.areAnimatorsEnabled()` is checked before starting motion. When the system disables
+animation, the spring and panel transition are skipped and their visual states jump directly to the
+correct endpoint. Non-essential panel motion is also disabled while Android power saver is active.
+This uses the public platform policy API rather than reading `Settings.Global` directly.
 
 ## Haptics
 
@@ -116,5 +128,5 @@ User-facing intensity setting including full off, per §8.1.
   frames and must not be read as a steady-state result.
 - **Idle cost.** `dumpsys batterystats` must show no measurable wake attributable to the IME while
   it is hidden.
-- **Reduced motion.** Set `Settings.Global.ANIMATOR_DURATION_SCALE` to 0 and confirm presses still
-  produce a visible state change with no travel.
+- **Reduced motion.** Set animator duration scale to 0 and confirm presses and panel switches still
+  produce their correct endpoint immediately, with no travel or fade.

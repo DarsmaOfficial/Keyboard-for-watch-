@@ -3,6 +3,7 @@ package dev.darsma.wearkey.uiwear
 import android.content.Context
 import android.graphics.Color
 import android.util.AttributeSet
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import dev.darsma.wearkey.imecore.EditorState
 
@@ -59,26 +60,38 @@ class KeyboardSurfaceView @JvmOverloads constructor(
         }
         addView(suggestionStrip)
 
+        // All mutually exclusive interaction surfaces occupy one fixed slot. Their bounds can
+        // never reflow when switching panels, which protects the key geometry under the finger.
+        val interactionSlot = FrameLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
+        }
+        addView(interactionSlot)
+
         keyGrid = KeyGridView(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
         }
-        addView(keyGrid)
+        interactionSlot.addView(keyGrid)
 
-        // Occupies the same slot as the key grid — on a 233dp round display there is no room to
-        // show both at once, so the clipboard panel replaces the keys while it is open.
         clipboardPanel = ClipboardPanelView(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
             visibility = GONE
         }
-        addView(clipboardPanel)
+        interactionSlot.addView(clipboardPanel)
 
-        // Same slot again, same reason: the emoji grid needs the full key area to show glyphs at a
-        // tappable size, so it replaces the keys rather than sharing space with them.
         emojiPanel = EmojiPanelView(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0).also { it.weight = 1f }
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
             visibility = GONE
         }
-        addView(emojiPanel)
+        interactionSlot.addView(emojiPanel)
     }
 
     /** Wires both sub-views to the given state in one call — keeps entry points' code trivial. */
@@ -94,6 +107,25 @@ class KeyboardSurfaceView @JvmOverloads constructor(
         compositionStrip.onCaretRequestListener = null
     }
 
+    private fun showSurface(target: android.view.View) {
+        val surfaces = listOf(keyGrid, clipboardPanel, emojiPanel)
+        surfaces.forEach { view ->
+            if (view !== target) {
+                view.animate().cancel()
+                view.visibility = GONE
+                view.alpha = 1f
+            }
+        }
+        target.animate().cancel()
+        target.visibility = VISIBLE
+        if (MotionPolicy.decorativeAnimationEnabled(context)) {
+            target.alpha = 0f
+            target.animate().alpha(1f).setDuration(PANEL_FADE_MS).start()
+        } else {
+            target.alpha = 1f
+        }
+    }
+
     /** True while the clipboard history panel is showing instead of the key grid. */
     val isClipboardOpen: Boolean
         get() = clipboardPanel.visibility == VISIBLE
@@ -103,14 +135,11 @@ class KeyboardSurfaceView @JvmOverloads constructor(
         // Symmetric with showEmoji: exactly one panel may occupy the key slot. Opening the
         // clipboard from the emoji layer previously left both VISIBLE, and which one the user saw
         // depended on child order rather than on intent.
-        emojiPanel.visibility = GONE
-        keyGrid.visibility = GONE
-        clipboardPanel.visibility = VISIBLE
+        showSurface(clipboardPanel)
     }
 
     fun hideClipboard() {
-        clipboardPanel.visibility = GONE
-        keyGrid.visibility = VISIBLE
+        showSurface(keyGrid)
     }
 
     fun toggleClipboard() {
@@ -124,14 +153,11 @@ class KeyboardSurfaceView @JvmOverloads constructor(
     fun showEmoji() {
         // Closing the clipboard first keeps the invariant that exactly one panel occupies the slot;
         // without it both could be VISIBLE and the later child would silently win.
-        clipboardPanel.visibility = GONE
-        keyGrid.visibility = GONE
-        emojiPanel.visibility = VISIBLE
+        showSurface(emojiPanel)
     }
 
     fun hideEmoji() {
-        emojiPanel.visibility = GONE
-        keyGrid.visibility = VISIBLE
+        showSurface(keyGrid)
     }
 
     fun toggleEmoji() {
@@ -164,5 +190,6 @@ class KeyboardSurfaceView @JvmOverloads constructor(
          * the rows get cramped, above ~0.70 the app's field starts getting pushed off screen.
          */
         const val KEYBOARD_HEIGHT_FRACTION = 0.66f
+        private const val PANEL_FADE_MS = 90L
     }
 }
