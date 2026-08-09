@@ -6,6 +6,9 @@
       as an optional/future feature. This app is offline and touch-only by design.
     -->
 
+    <!-- Local hardware haptics only; normal permission, no runtime prompt. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <uses-feature
         android:name="android.hardware.type.watch"
         android:required="true" />

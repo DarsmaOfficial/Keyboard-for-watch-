@@ -726,6 +726,12 @@ class WearKeyImeService : InputMethodService() {
          * last dismissed. Without that fallback the numbers would be unreadable by construction:
          * leaving the field to open Settings is what tears down the very view holding them.
          */
+        /** Applies settings immediately when the Settings activity changes them. */
+        fun refreshVisualSettings(theme: KeyboardTheme, hapticIntensity: Float) {
+            liveKeyGrid?.theme = theme
+            liveKeyGrid?.haptics?.intensity = hapticIntensity
+        }
+
         fun frameStats(): KeyGridView.FrameStats? =
             liveKeyGrid?.frameStats() ?: lastFrameStats
 

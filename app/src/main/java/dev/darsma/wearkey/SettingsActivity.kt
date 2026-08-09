@@ -57,6 +57,10 @@ class SettingsActivity : Activity() {
                     else -> 0f
                 }
                 updateHapticLabel(prefs)
+                WearKeyImeService.refreshVisualSettings(
+                    KeyboardTheme.byId(prefs.themeId),
+                    prefs.hapticIntensity
+                )
             }
         )
         updateHapticLabel(prefs)
@@ -108,6 +112,10 @@ class SettingsActivity : Activity() {
                 val current = ids.indexOf(KeyboardTheme.byId(store.themeId).id)
                 store.themeId = ids[(current + 1) % ids.size]
                 updateThemeLabel(themeValue)
+                WearKeyImeService.refreshVisualSettings(
+                    KeyboardTheme.byId(store.themeId),
+                    store.hapticIntensity
+                )
                 toast(getString(R.string.theme_changed))
             }
         )

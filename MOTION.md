@@ -69,7 +69,7 @@ platform text-cursor convention, so it looks native rather than novel.
 
 | Property | Value |
 |---|---|
-| Animated property | destination alpha only |
+| Animated property | destination alpha `0.55→1` and scale `0.96→1` |
 | Duration | 90 ms |
 | Geometry | unchanged; all surfaces share one fixed `FrameLayout` slot |
 | Input ownership | destination only, immediately |

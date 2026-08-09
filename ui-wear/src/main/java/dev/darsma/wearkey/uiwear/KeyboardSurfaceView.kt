@@ -114,15 +114,29 @@ class KeyboardSurfaceView @JvmOverloads constructor(
                 view.animate().cancel()
                 view.visibility = GONE
                 view.alpha = 1f
+                view.scaleX = 1f
+                view.scaleY = 1f
             }
         }
         target.animate().cancel()
         target.visibility = VISIBLE
         if (MotionPolicy.decorativeAnimationEnabled(context)) {
-            target.alpha = 0f
-            target.animate().alpha(1f).setDuration(PANEL_FADE_MS).start()
+            // Alpha alone was imperceptible because every surface is predominantly AMOLED black.
+            // A tiny scale reveal stays inside the fixed slot: visible, but never moves a key's
+            // final position or leaves the outgoing surface accepting input.
+            target.alpha = 0.55f
+            target.scaleX = 0.96f
+            target.scaleY = 0.96f
+            target.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(PANEL_FADE_MS)
+                .start()
         } else {
             target.alpha = 1f
+            target.scaleX = 1f
+            target.scaleY = 1f
         }
     }
 

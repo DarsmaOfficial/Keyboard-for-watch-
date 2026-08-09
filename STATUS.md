@@ -25,7 +25,7 @@ never measured is not a gate that passed.
 | APK size | ≤ 15 MB | **3.0 MB optimized release benchmark** | ✅ verified |
 | No arm64 libraries | 0 | **0** | ✅ verified |
 | No `androidx.compose.*` in keyboard path | 0 | **0** | ✅ CI-enforced |
-| Permissions declared | 0 | **0** — not even `INTERNET` | ✅ verified |
+| Sensitive permissions | 0 | **0** — no `INTERNET`, `RECORD_AUDIO`, storage, contacts or location; only normal `VIBRATE` for key haptics | ✅ verified |
 | Composed text always visible | 100% of fields | browser URL + real plain/multiline/password/number/search fields and local notification `RemoteInput` pass | ⚠️ partial — WhatsApp intentionally skipped |
 | Frame time, 95th percentile | ≥ 95% under 16.6 ms | **p95 = 2.51 ms, 0.39% over budget** (259 frames) | ✅ verified |
 | Cold IME show | < 150 ms | warm median **55.5 ms**; true-cold optimized median **372.2 ms** (n=5 each) | ❌ **literal cold gate fails; resident show passes** |

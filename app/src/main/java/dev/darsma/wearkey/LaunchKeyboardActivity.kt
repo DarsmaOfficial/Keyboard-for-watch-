@@ -10,6 +10,7 @@ import dev.darsma.wearkey.uiwear.ClipboardPanelView
 import dev.darsma.wearkey.uiwear.EmojiPanelView
 import dev.darsma.wearkey.uiwear.KeyGridView
 import dev.darsma.wearkey.uiwear.KeyboardSurfaceView
+import dev.darsma.wearkey.uiwear.KeyboardTheme
 
 /**
  * Entry point 2 (spec §4.5). On Wear OS most real input (notification replies, WhatsApp,
@@ -33,6 +34,9 @@ class LaunchKeyboardActivity : Activity() {
 
         val view = KeyboardSurfaceView(this)
         view.bind(editorState)
+        val settings = SettingsStore(this)
+        view.keyGrid.theme = KeyboardTheme.byId(settings.themeId)
+        view.keyGrid.haptics.intensity = settings.hapticIntensity
         view.keyGrid.onKeyListener = KeyGridView.OnKeyListener { action -> handleKey(action) }
         view.clipboardPanel.bind(clipboardStore)
         view.clipboardPanel.listener = object : ClipboardPanelView.Listener {

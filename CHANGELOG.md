@@ -7,6 +7,9 @@ is reached.
 ## [Unreleased]
 
 ### Fixed
+- Haptics now declare Android's normal `VIBRATE` permission; the previous implementation silently failed despite valid vibrator hardware and effects.
+- Theme and haptic changes now apply immediately to a live IME and also initialise correctly in the Wear `LAUNCH_KEYBOARD` activity.
+- Panel transitions now combine a subtle fixed-slot scale reveal with alpha, making them perceptible on predominantly black AMOLED surfaces.
 - Emoji mode now has a fixed `‹ ABC` / `‹ АБВ` return control; system Back also returns to the key grid instead of dismissing or trapping the keyboard.
 - Tutorial controls now remain reachable on a 466×466 round display when translated text exceeds one screen height.
 - Rejected touch-calibration fits can no longer be retained as pending values and later applied.
