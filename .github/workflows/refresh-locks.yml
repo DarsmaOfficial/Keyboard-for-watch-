@@ -41,8 +41,10 @@ jobs:
 
       - name: Commit lockfiles
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # The repository has one author identity. Automation may perform the mechanical commit,
+          # but it must never create a second contributor or authorship record.
+          git config user.name "DarsmaOfficial"
+          git config user.email "darsmaofficial@gmail.com"
           git add -A '*gradle.lockfile' || true
           if git diff --cached --quiet; then
             echo "lockfiles unchanged"
