@@ -237,12 +237,22 @@ class KeyGridView @JvmOverloads constructor(
     // settles rather than snapping, which is what makes it read as physical rather than
     // mechanical.
     private var pressScale = 1f
+    private var pressMorph = 0f
 
     private val pressScaleProperty =
         object : androidx.dynamicanimation.animation.FloatPropertyCompat<KeyGridView>("pressScale") {
             override fun getValue(view: KeyGridView): Float = view.pressScale * 100f
             override fun setValue(view: KeyGridView, value: Float) {
                 view.pressScale = value / 100f
+                view.invalidate()
+            }
+        }
+
+    private val pressMorphProperty =
+        object : androidx.dynamicanimation.animation.FloatPropertyCompat<KeyGridView>("pressMorph") {
+            override fun getValue(view: KeyGridView): Float = view.pressMorph * 100f
+            override fun setValue(view: KeyGridView, value: Float) {
+                view.pressMorph = (value / 100f).coerceIn(0f, 1f)
                 view.invalidate()
             }
         }
@@ -260,13 +270,25 @@ class KeyGridView @JvmOverloads constructor(
         }
     }
 
+    private val pressMorphSpring by lazy {
+        androidx.dynamicanimation.animation.SpringAnimation(this, pressMorphProperty).apply {
+            spring = androidx.dynamicanimation.animation.SpringForce().apply {
+                dampingRatio = androidx.dynamicanimation.animation.SpringForce.DAMPING_RATIO_NO_BOUNCY
+                stiffness = androidx.dynamicanimation.animation.SpringForce.STIFFNESS_HIGH
+            }
+        }
+    }
+
     private fun animatePressTo(target: Float) {
+        val morphTarget = if (target < 1f) 1f else 0f
         if (!MotionPolicy.essentialAnimationEnabled()) {
             pressScale = target
+            pressMorph = morphTarget
             invalidate()
             return
         }
         pressSpring.animateToFinalPosition(target * 100f)
+        pressMorphSpring.animateToFinalPosition(morphTarget * 100f)
     }
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -652,6 +674,17 @@ class KeyGridView @JvmOverloads constructor(
         color = Color.parseColor("#00E5FF")
     }
 
+    private fun blendColor(from: Int, to: Int, t: Float): Int {
+        val p = t.coerceIn(0f, 1f)
+        fun channel(a: Int, b: Int) = (a + (b - a) * p).toInt().coerceIn(0, 255)
+        return Color.argb(
+            channel(Color.alpha(from), Color.alpha(to)),
+            channel(Color.red(from), Color.red(to)),
+            channel(Color.green(from), Color.green(to)),
+            channel(Color.blue(from), Color.blue(to))
+        )
+    }
+
     private fun drawTrail(canvas: Canvas) {
         if (!swiping || traceCount < 2) return
 
@@ -679,13 +712,22 @@ class KeyGridView @JvmOverloads constructor(
             // from caps lock without hunting for a separate indicator.
             val shiftActive = key.action === KeyAction.Shift &&
                 !symbolLayerVisible && shiftState != ShiftState.OFF
+            val isPressed = key === pressedKey
             val paint = when {
-                key === pressedKey -> keyPressedPaint
+                isPressed -> keyPressedPaint
                 shiftActive && shiftState == ShiftState.CAPS_LOCK -> keyAccentPaint
                 shiftActive -> keyActivePaint
                 else -> keyPaint
             }
-            val radius = minOf(key.rect.width(), key.rect.height()) * 0.28f
+            val baseRadius = minOf(key.rect.width(), key.rect.height()) * 0.28f
+            val radius = if (isPressed) {
+                // As the key compresses, its corners soften into a more pill-like material shape.
+                baseRadius + minOf(key.rect.width(), key.rect.height()) * 0.18f * pressMorph
+            } else baseRadius
+
+            if (isPressed) {
+                keyPressedPaint.color = blendColor(theme.letterKey, theme.pressedKey, pressMorph)
+            }
 
             // The pressed key is drawn scaled about its own centre, driven by the spring.
             // Everything else draws normally — no per-frame work for untouched keys.
@@ -1020,6 +1062,10 @@ class KeyGridView @JvmOverloads constructor(
     }
 
     override fun onDetachedFromWindow() {
+        pressSpring.cancel()
+        pressMorphSpring.cancel()
+        pressScale = 1f
+        pressMorph = 0f
         stopFrameTiming()
         frameTimingEnabled = false
         super.onDetachedFromWindow()

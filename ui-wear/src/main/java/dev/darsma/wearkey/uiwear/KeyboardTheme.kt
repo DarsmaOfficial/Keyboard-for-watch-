@@ -83,6 +83,31 @@ data class KeyboardTheme(
 
         val ALL = listOf(MIDNIGHT, HIGH_CONTRAST, AMBER)
 
+        /** One coherent palette frame for whole-surface theme morphing. */
+        fun interpolate(from: KeyboardTheme, to: KeyboardTheme, progress: Float): KeyboardTheme {
+            val t = progress.coerceIn(0f, 1f)
+            fun color(a: Int, b: Int): Int = Color.argb(
+                lerp(Color.alpha(a), Color.alpha(b), t),
+                lerp(Color.red(a), Color.red(b), t),
+                lerp(Color.green(a), Color.green(b), t),
+                lerp(Color.blue(a), Color.blue(b), t)
+            )
+            return KeyboardTheme(
+                id = if (t < 1f) "morph" else to.id,
+                background = color(from.background, to.background),
+                letterKey = color(from.letterKey, to.letterKey),
+                functionKey = color(from.functionKey, to.functionKey),
+                pressedKey = color(from.pressedKey, to.pressedKey),
+                accent = color(from.accent, to.accent),
+                label = color(from.label, to.label),
+                keyStrokeDp = from.keyStrokeDp + (to.keyStrokeDp - from.keyStrokeDp) * t,
+                keyStroke = color(from.keyStroke, to.keyStroke)
+            )
+        }
+
+        private fun lerp(a: Int, b: Int, t: Float): Int =
+            (a + (b - a) * t).toInt().coerceIn(0, 255)
+
         /** Looks up by id, falling back to the default rather than throwing on unknown input. */
         fun byId(id: String?): KeyboardTheme = ALL.firstOrNull { it.id == id } ?: MIDNIGHT
     }

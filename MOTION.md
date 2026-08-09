@@ -53,6 +53,20 @@ in sunlight, and by users with reduced colour discrimination.
 centre while the rest of the grid draws unchanged. Untouched keys cost nothing per frame, so a
 press does not scale with keyboard size.
 
+### Key material morph
+
+The press spring now drives three synchronized properties inside the key's unchanged hit rectangle:
+scale (`1→0.88`), corner softness (`28%→46%` of key height), and fill interpolation from the theme's
+rest colour to its pressed colour. Scale can overshoot on release; colour/corner progress uses a
+critically damped companion spring so it never flashes or rings.
+
+### Whole-surface theme morph
+
+Every themed paint—composition strip, caret, suggestions, key grid, clipboard and emoji panel—
+interpolates as one palette over 260 ms using the platform emphasized easing curve
+`PathInterpolator(0.2, 0, 0, 1)`. Interrupted theme changes restart from the currently rendered
+palette, not the previous endpoint. Reduced motion and power saver apply the endpoint instantly.
+
 ### Caret — blink
 
 | Property | Value |
@@ -69,8 +83,8 @@ platform text-cursor convention, so it looks native rather than novel.
 
 | Property | Value |
 |---|---|
-| Animated property | destination alpha `0.55→1` and scale `0.96→1` |
-| Duration | 90 ms |
+| Animated property | destination alpha `0→1`, scale `0.90→1`, translate Y `8dp→0`; source alpha `1→0`, scale `1→1.035`, translate Y `0→-4dp` |
+| Duration | enter 180 ms; exit 120 ms |
 | Geometry | unchanged; all surfaces share one fixed `FrameLayout` slot |
 | Input ownership | destination only, immediately |
 | Disabled when | system animation is off or power saver is active |

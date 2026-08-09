@@ -1,7 +1,9 @@
 package dev.darsma.wearkey.uiwear
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Color
+import android.view.animation.PathInterpolator
 import android.util.AttributeSet
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -35,17 +37,44 @@ class KeyboardSurfaceView @JvmOverloads constructor(
     val clipboardPanel: ClipboardPanelView
     val emojiPanel: EmojiPanelView
 
+    private var themeAnimator: ValueAnimator? = null
+    private var renderedTheme: KeyboardTheme = KeyboardTheme.MIDNIGHT
+
     var theme: KeyboardTheme = KeyboardTheme.MIDNIGHT
         set(value) {
             if (field == value) return
             field = value
-            setBackgroundColor(value.background)
-            compositionStrip.applyTheme(value)
-            suggestionStrip.applyTheme(value)
-            keyGrid.theme = value
-            clipboardPanel.applyTheme(value)
-            emojiPanel.applyTheme(value)
+            morphThemeTo(value)
         }
+
+    private fun applyThemeFrame(value: KeyboardTheme) {
+        renderedTheme = value
+        setBackgroundColor(value.background)
+        compositionStrip.applyTheme(value)
+        suggestionStrip.applyTheme(value)
+        keyGrid.theme = value
+        clipboardPanel.applyTheme(value)
+        emojiPanel.applyTheme(value)
+    }
+
+    private fun morphThemeTo(target: KeyboardTheme) {
+        themeAnimator?.cancel()
+        if (!MotionPolicy.decorativeAnimationEnabled(context) || !isAttachedToWindow) {
+            applyThemeFrame(target)
+            return
+        }
+        val start = renderedTheme
+        themeAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = THEME_MORPH_MS
+            interpolator = MOTION_EASING
+            addUpdateListener { animation ->
+                applyThemeFrame(
+                    KeyboardTheme.interpolate(start, target, animation.animatedValue as Float)
+                )
+            }
+            start()
+        }
+    }
 
     init {
         setBackgroundColor(Color.BLACK)
@@ -106,10 +135,7 @@ class KeyboardSurfaceView @JvmOverloads constructor(
         interactionSlot.addView(emojiPanel)
 
         // Apply once after all children exist; subsequent assignments propagate live.
-        compositionStrip.applyTheme(theme)
-        suggestionStrip.applyTheme(theme)
-        clipboardPanel.applyTheme(theme)
-        emojiPanel.applyTheme(theme)
+        applyThemeFrame(theme)
     }
 
     /** Wires both sub-views to the given state in one call — keeps entry points' code trivial. */
@@ -127,35 +153,60 @@ class KeyboardSurfaceView @JvmOverloads constructor(
 
     private fun showSurface(target: android.view.View) {
         val surfaces = listOf(keyGrid, clipboardPanel, emojiPanel)
-        surfaces.forEach { view ->
-            if (view !== target) {
-                view.animate().cancel()
-                view.visibility = GONE
-                view.alpha = 1f
-                view.scaleX = 1f
-                view.scaleY = 1f
-            }
-        }
-        target.animate().cancel()
+        val outgoing = surfaces.firstOrNull { it.visibility == VISIBLE && it !== target }
+        surfaces.forEach { it.animate().cancel() }
+
+        // Input ownership changes immediately. The outgoing surface may remain visible for the
+        // visual handoff, but it can no longer receive a touch.
+        outgoing?.isEnabled = false
+        target.isEnabled = true
         target.visibility = VISIBLE
-        if (MotionPolicy.decorativeAnimationEnabled(context)) {
-            // Alpha alone was imperceptible because every surface is predominantly AMOLED black.
-            // A tiny scale reveal stays inside the fixed slot: visible, but never moves a key's
-            // final position or leaves the outgoing surface accepting input.
-            target.alpha = 0.55f
-            target.scaleX = 0.96f
-            target.scaleY = 0.96f
-            target.animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(PANEL_FADE_MS)
-                .start()
-        } else {
-            target.alpha = 1f
-            target.scaleX = 1f
-            target.scaleY = 1f
+
+        if (!MotionPolicy.decorativeAnimationEnabled(context)) {
+            surfaces.forEach { view ->
+                view.visibility = if (view === target) VISIBLE else GONE
+                resetTransform(view)
+            }
+            return
         }
+
+        target.alpha = 0f
+        target.scaleX = 0.90f
+        target.scaleY = 0.90f
+        target.translationY = 8f * resources.displayMetrics.density
+        target.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .translationY(0f)
+            .setInterpolator(MOTION_EASING)
+            .setDuration(PANEL_MORPH_MS)
+            .start()
+
+        outgoing?.animate()
+            ?.alpha(0f)
+            ?.scaleX(1.035f)
+            ?.scaleY(1.035f)
+            ?.translationY(-4f * resources.displayMetrics.density)
+            ?.setInterpolator(MOTION_EASING)
+            ?.setDuration(PANEL_EXIT_MS)
+            ?.withEndAction {
+                outgoing.visibility = GONE
+                resetTransform(outgoing)
+            }
+            ?.start()
+
+        surfaces.filter { it !== target && it !== outgoing }.forEach { view ->
+            view.visibility = GONE
+            resetTransform(view)
+        }
+    }
+
+    private fun resetTransform(view: android.view.View) {
+        view.alpha = 1f
+        view.scaleX = 1f
+        view.scaleY = 1f
+        view.translationY = 0f
     }
 
     /** True while the clipboard history panel is showing instead of the key grid. */
@@ -210,6 +261,13 @@ class KeyboardSurfaceView @JvmOverloads constructor(
         )
     }
 
+    override fun onDetachedFromWindow() {
+        themeAnimator?.cancel()
+        themeAnimator = null
+        listOf(keyGrid, clipboardPanel, emojiPanel).forEach { it.animate().cancel() }
+        super.onDetachedFromWindow()
+    }
+
     fun startFrameTiming() = keyGrid.startFrameTiming()
     fun stopFrameTiming() = keyGrid.stopFrameTiming()
     fun frameStats(): KeyGridView.FrameStats? = keyGrid.frameStats()
@@ -222,6 +280,9 @@ class KeyboardSurfaceView @JvmOverloads constructor(
          * the rows get cramped, above ~0.70 the app's field starts getting pushed off screen.
          */
         const val KEYBOARD_HEIGHT_FRACTION = 0.66f
-        private const val PANEL_FADE_MS = 90L
+        private const val PANEL_MORPH_MS = 180L
+        private const val PANEL_EXIT_MS = 120L
+        private const val THEME_MORPH_MS = 260L
+        private val MOTION_EASING = PathInterpolator(0.2f, 0f, 0f, 1f)
     }
 }

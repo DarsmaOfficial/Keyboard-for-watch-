@@ -53,6 +53,7 @@ is reached.
   APK and removes a redundant second copy of the same data.
 
 ### Added
+- Cohesive semantic motion system: synchronized material key morphs, interruptible whole-surface theme interpolation, and fixed-slot panel cross-transforms. All motion uses platform APIs plus Apache-2.0 AndroidX springs and is disabled by reduced-motion/power-saver policy.
 - Opt-in spatial word prediction: calibrated per-key tap probabilities are held only until Space, Enter, or an explicit candidate selection resolves the word.
 - Clipboard history (spec §6): panel replacing the key grid, one-tap paste, pin/unpin, delete,
   clear-all. Entries that look like one-time codes or card numbers are flagged and expire after
